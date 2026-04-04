@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     openai_api_key: str = ""
 
+    seed_admin_password: str = "changeme"
+
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
 
     model_config = {"env_file": ".env", "extra": "ignore"}

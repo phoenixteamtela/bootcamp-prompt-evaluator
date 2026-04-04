@@ -59,5 +59,6 @@ async def get_or_create_seed_admin(db: AsyncSession) -> None:
     result = await db.execute(select(User).limit(1))
     if result.scalar_one_or_none() is not None:
         return
-    await create_user(db, "admin", "Admin", "admin123", is_admin=True)
+    settings = get_settings()
+    await create_user(db, "admin", "Admin", settings.seed_admin_password, is_admin=True)
     await db.commit()

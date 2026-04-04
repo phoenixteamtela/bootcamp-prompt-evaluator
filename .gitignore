@@ -12,6 +12,9 @@ venv/
 node_modules/
 frontend/dist/
 
+# Credentials / local config
+.claude/settings.local.json
+
 # IDE
 .vscode/
 .idea/
