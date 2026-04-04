@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { colors, gradients } from '../theme';
 import ScoreBadge from '../components/common/ScoreBadge';
+import Tooltip from '../components/common/Tooltip';
 
 interface Project {
   id: string;
@@ -25,7 +26,10 @@ export default function ProjectsPage() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h1 style={{ color: colors.navy, margin: 0, fontSize: 24 }}>My Projects</h1>
+        <h1 style={{ color: colors.navy, margin: 0, fontSize: 24, display: 'flex', alignItems: 'center' }}>
+          My Projects
+          <Tooltip text="A project is one prompt engineering challenge. It contains your task definition, test datasets, prompt versions, and evaluation results — everything you need to iterate toward a better prompt." />
+        </h1>
         <Link
           to="/projects/new"
           style={{

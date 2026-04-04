@@ -66,7 +66,7 @@ export default function PromptStep({ state, actions }: Props) {
             <h2 style={{ margin: 0, fontSize: 16, color: colors.navy, display: 'flex', alignItems: 'center' }}>
               {isEditing ? 'New Version' : `Version ${selectedVersion?.version_number || '--'}`}
               {selectedVersion?.label && !isEditing && <span style={{ color: colors.gray[400], fontWeight: 400 }}> — {selectedVersion.label}</span>}
-              {isEditing && <Tooltip text="Optional label to identify this version (e.g., 'added examples', 'simplified instructions')" />}
+              {isEditing && <Tooltip text="Give this version a short name so you can remember what you changed, like 'added examples' or 'more specific instructions.'" />}
             </h2>
             {isEditing && (
               <input
@@ -79,7 +79,7 @@ export default function PromptStep({ state, actions }: Props) {
           </div>
           <div style={{ fontSize: 11, color: colors.gray[400], marginBottom: 8, display: 'flex', alignItems: 'center' }}>
             Input variables: {Object.keys(project.prompt_inputs_spec).join(', ')}
-            <Tooltip text="Write your instructions here. Test case data is automatically injected as the user message during evaluation. You can optionally use {variable_name} syntax to place inputs inline." />
+            <Tooltip text="This is where you write the instructions the AI will follow. When an evaluation runs, each test case's input data is automatically provided to the AI along with your instructions." />
           </div>
           <textarea
             value={editingTemplate}

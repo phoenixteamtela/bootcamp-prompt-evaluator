@@ -81,7 +81,7 @@ export default function RunEvalStep({ state, actions }: Props) {
           <div>
             <label style={{ fontSize: 11, color: colors.gray[500], display: 'flex', alignItems: 'center', marginBottom: 4 }}>
               Run Model
-              <Tooltip text="The AI model that will execute your prompt. Different models have different capabilities and costs." />
+              <Tooltip text="Which AI model will follow your instructions. Larger models are generally smarter but cost more. Try a smaller model first, then compare with a larger one to see if it makes a difference." />
             </label>
             <select value={runModel} onChange={e => setRunModel(e.target.value)} style={selectStyle}>
               {models.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
@@ -90,7 +90,7 @@ export default function RunEvalStep({ state, actions }: Props) {
           <div>
             <label style={{ fontSize: 11, color: colors.gray[500], display: 'flex', alignItems: 'center', marginBottom: 4 }}>
               Grading Model
-              <Tooltip text="The AI model that judges output quality. Acts as an automated grader scoring each response 1-10." />
+              <Tooltip text="A separate AI that reads each response and scores it from 1-10, like a teaching assistant grading homework. It checks whether the response meets the success criteria for each test case." />
             </label>
             <select value={gradingModel} onChange={e => setGradingModel(e.target.value)} style={selectStyle}>
               {models.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
@@ -99,7 +99,7 @@ export default function RunEvalStep({ state, actions }: Props) {
           <div>
             <label style={{ fontSize: 11, color: colors.gray[500], display: 'flex', alignItems: 'center', marginBottom: 4 }}>
               Temperature
-              <Tooltip text="Controls randomness. Lower (0-0.3) = focused and deterministic. Higher (0.7-1.0) = creative and varied." />
+              <Tooltip text="How creative or predictable the AI's responses will be. Low values (near 0) give consistent, focused answers. Higher values (near 1) produce more varied and creative responses." />
             </label>
             <input
               type="number" step="0.1" min="0" max="2" value={temperature}

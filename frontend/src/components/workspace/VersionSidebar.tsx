@@ -15,7 +15,7 @@ export default function VersionSidebar({ versions, selectedVersion, onSelectVers
     <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.gray[200]}`, overflow: 'hidden' }}>
       <div style={{ padding: '12px 16px', borderBottom: `1px solid ${colors.gray[200]}`, fontWeight: 600, fontSize: 14, color: colors.navy, display: 'flex', alignItems: 'center' }}>
         Versions
-        <Tooltip text="Each version is a snapshot of your prompt. Create new versions to track changes and compare scores." position="right" />
+        <Tooltip text="Every time you save your prompt, it's saved as a new version. This lets you try different approaches and compare which version gets the best scores." position="right" />
       </div>
       {versions.map(v => (
         <div

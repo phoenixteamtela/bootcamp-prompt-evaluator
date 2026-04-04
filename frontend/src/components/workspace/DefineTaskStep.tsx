@@ -24,7 +24,7 @@ export default function DefineTaskStep({ state, actions }: Props) {
       <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.gray[200]}`, padding: 20 }}>
         <h2 style={{ margin: '0 0 12px', fontSize: 16, color: colors.navy, display: 'flex', alignItems: 'center' }}>
           Task Description
-          <Tooltip text="This is the AI task your prompt needs to solve. It was defined when you created the project." />
+          <Tooltip text="The goal your prompt is trying to achieve. All test cases and grading are based on how well the AI accomplishes this task." />
         </h2>
         <div style={{
           padding: 14, borderRadius: 8, background: colors.gray[50],
@@ -39,7 +39,7 @@ export default function DefineTaskStep({ state, actions }: Props) {
       <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.gray[200]}`, padding: 20 }}>
         <h2 style={{ margin: '0 0 12px', fontSize: 16, color: colors.navy, display: 'flex', alignItems: 'center' }}>
           Input Variables
-          <Tooltip text="These variables will be injected into your prompt template using {variable_name} syntax." />
+          <Tooltip text="The pieces of information that change with each test case. When you run an evaluation, each test scenario provides different values for these variables so the AI is tested on a variety of inputs." />
         </h2>
         {inputKeys.length === 0 ? (
           <p style={{ color: colors.gray[400], fontSize: 13 }}>No input variables defined.</p>
@@ -71,7 +71,7 @@ export default function DefineTaskStep({ state, actions }: Props) {
         <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.gray[200]}`, padding: 20 }}>
           <h2 style={{ margin: '0 0 12px', fontSize: 16, color: colors.navy, display: 'flex', alignItems: 'center' }}>
             Extra Grading Criteria
-            <Tooltip text="Additional criteria the LLM judge will use when scoring outputs, beyond the default solution criteria." />
+            <Tooltip text="Extra rules that apply to every response. The AI grader will check these on top of the scenario-specific criteria. Anything here that's violated means an automatic low score." />
           </h2>
           <div style={{
             padding: 14, borderRadius: 8, background: colors.gray[50],

@@ -71,7 +71,10 @@ export default function NewProjectPage() {
 
   return (
     <div style={{ maxWidth: 640, margin: '0 auto' }}>
-      <h1 style={{ color: colors.navy, fontSize: 24, marginBottom: 24 }}>New Project</h1>
+      <h1 style={{ color: colors.navy, fontSize: 24, marginBottom: 24, display: 'flex', alignItems: 'center' }}>
+        New Project
+        <Tooltip text="A project is one prompt engineering challenge. It contains your task definition, test datasets, prompt versions, and evaluation results — everything you need to iterate toward a better prompt." />
+      </h1>
       <form onSubmit={handleSubmit}>
         <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.gray[200]}`, padding: 24, marginBottom: 16 }}>
           <div style={{ marginBottom: 16 }}>
@@ -81,14 +84,14 @@ export default function NewProjectPage() {
           <div style={{ marginBottom: 16 }}>
             <label style={{ ...labelStyle, display: 'flex', alignItems: 'center' }}>
               Task Description
-              <Tooltip text="Describe what your prompt should accomplish. This helps generate relevant test cases." />
+              <Tooltip text="What do you want the AI to do? For example: 'Summarize legal documents' or 'Generate meal plans based on dietary needs.' This guides the kind of test scenarios that get created." />
             </label>
             <textarea value={taskDescription} onChange={e => setTaskDescription(e.target.value)} required rows={4} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Describe what the prompt should accomplish..." />
           </div>
           <div style={{ marginBottom: 16 }}>
             <label style={{ ...labelStyle, display: 'flex', alignItems: 'center' }}>
               Extra Criteria (optional)
-              <Tooltip text="Mandatory requirements every response must meet, regardless of test case. Overrides default grading criteria." />
+              <Tooltip text="Rules that every AI response must follow, no matter what. For example: 'Always respond in bullet points' or 'Never exceed 200 words.' Violations here mean an automatic low score." />
             </label>
             <textarea value={extraCriteria} onChange={e => setExtraCriteria(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Mandatory requirements that override all other criteria..." />
           </div>
@@ -97,7 +100,7 @@ export default function NewProjectPage() {
         <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.gray[200]}`, padding: 24, marginBottom: 16 }}>
           <label style={{ ...labelStyle, marginBottom: 12, display: 'flex', alignItems: 'center' }}>
             Prompt Input Variables
-            <Tooltip text="Define dynamic inputs your prompt receives. Each variable becomes a {placeholder} in your prompt template." />
+            <Tooltip text="These are the pieces of information that change with each test case. For example, a summarization task might have a 'document' variable — each test case provides a different document for the AI to summarize." />
           </label>
           {inputs.map((input, i) => (
             <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>

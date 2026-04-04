@@ -44,14 +44,14 @@ export default function ResultsStep({ state, actions }: Props) {
               <div style={{ background: colors.gray[50], padding: 12, borderRadius: 8, flex: 1, minWidth: 120 }}>
                 <div style={{ fontSize: 11, color: colors.gray[500], display: 'flex', alignItems: 'center' }}>
                   Avg Score
-                  <Tooltip text="Average score across all test cases (1-10 scale). Higher is better." />
+                  <Tooltip text="The overall grade for this evaluation run, averaged across all test scenarios. A score of 8+ means your prompt is performing well." />
                 </div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: colors.navy }}>{viewingRun.avg_score?.toFixed(1) ?? '--'}</div>
               </div>
               <div style={{ background: colors.gray[50], padding: 12, borderRadius: 8, flex: 1, minWidth: 120 }}>
                 <div style={{ fontSize: 11, color: colors.gray[500], display: 'flex', alignItems: 'center' }}>
                   Pass Rate
-                  <Tooltip text="Percentage of test cases scoring 8 or above." />
+                  <Tooltip text="What percentage of test scenarios your prompt handled well (scored 8 or above). A high pass rate means your prompt works reliably across different situations." />
                 </div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: colors.navy }}>{viewingRun.pass_rate?.toFixed(1) ?? '--'}%</div>
               </div>

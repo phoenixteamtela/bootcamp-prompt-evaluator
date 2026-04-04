@@ -1,4 +1,4 @@
-import { useState, ReactNode } from 'react';
+import { useState, useRef, useEffect, useCallback, ReactNode } from 'react';
 import { colors } from '../../theme';
 
 interface TooltipProps {
@@ -7,12 +7,28 @@ interface TooltipProps {
   children?: ReactNode;
 }
 
-export default function Tooltip({ text, position = 'top', children }: TooltipProps) {
+export default function Tooltip({ text, position = 'bottom', children }: TooltipProps) {
   const [visible, setVisible] = useState(false);
+  const bubbleRef = useRef<HTMLSpanElement>(null);
+  const wrapperRef = useRef<HTMLSpanElement>(null);
+  const [nudge, setNudge] = useState(0);
+
+  const clamp = useCallback(() => {
+    if (!bubbleRef.current) return;
+    const rect = bubbleRef.current.getBoundingClientRect();
+    let shift = 0;
+    if (rect.left < 8) shift = 8 - rect.left;
+    else if (rect.right > window.innerWidth - 8) shift = window.innerWidth - 8 - rect.right;
+    if (shift !== nudge) setNudge(shift);
+  }, [nudge]);
+
+  useEffect(() => {
+    if (visible) clamp();
+  }, [visible, clamp]);
 
   const positionStyle: React.CSSProperties =
-    position === 'top' ? { bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: 6 } :
-    position === 'bottom' ? { top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 6 } :
+    position === 'top' ? { bottom: '100%', left: '50%', transform: `translateX(calc(-50% + ${nudge}px))`, marginBottom: 6 } :
+    position === 'bottom' ? { top: '100%', left: '50%', transform: `translateX(calc(-50% + ${nudge}px))`, marginTop: 6 } :
     position === 'left' ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 6 } :
     { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 6 };
 
@@ -25,7 +41,7 @@ export default function Tooltip({ text, position = 'top', children }: TooltipPro
     lineHeight: 1.4,
     padding: '8px 10px',
     borderRadius: 6,
-    width: 220,
+    width: 240,
     zIndex: 1000,
     pointerEvents: 'none',
     fontWeight: 400,
@@ -41,12 +57,13 @@ export default function Tooltip({ text, position = 'top', children }: TooltipPro
 
   return (
     <span
+      ref={wrapperRef}
       style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
-      onMouseEnter={() => setVisible(true)}
+      onMouseEnter={() => { setNudge(0); setVisible(true); }}
       onMouseLeave={() => setVisible(false)}
     >
       {children || icon}
-      {visible && <span style={bubble}>{text}</span>}
+      {visible && <span ref={bubbleRef} style={bubble}>{text}</span>}
     </span>
   );
 }

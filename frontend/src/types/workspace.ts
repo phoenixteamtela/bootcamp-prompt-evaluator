@@ -15,12 +15,19 @@ export interface Version {
   latest_pass_rate: number | null;
 }
 
+export interface TestCase {
+  id: string;
+  scenario: string;
+  prompt_inputs: Record<string, string>;
+  solution_criteria: string[];
+}
+
 export interface Dataset {
   id: string;
   name: string;
   num_cases: number;
   status: string;
-  test_cases: { id: string; scenario: string }[];
+  test_cases: TestCase[];
 }
 
 export interface EvalRun {
