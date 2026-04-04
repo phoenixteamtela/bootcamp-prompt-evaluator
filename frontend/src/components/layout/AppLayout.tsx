@@ -38,6 +38,7 @@ export default function AppLayout() {
           </Link>
           <nav style={{ display: 'flex', gap: 4 }}>
             {[
+              { to: '/about', label: 'About' },
               { to: '/projects', label: 'Projects' },
               { to: '/leaderboard', label: 'Leaderboard' },
               ...(user?.is_admin ? [{ to: '/admin', label: 'Admin' }] : []),

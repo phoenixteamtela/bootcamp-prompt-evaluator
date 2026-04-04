@@ -7,6 +7,7 @@ import NewProjectPage from './pages/NewProjectPage';
 import ProjectWorkspacePage from './pages/ProjectWorkspacePage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import AdminPage from './pages/AdminPage';
+import AboutPage from './pages/AboutPage';
 
 function ProtectedRoute({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
   const { user, loading } = useAuth();
@@ -19,7 +20,7 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.React
 function LoginGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}>Loading...</div>;
-  if (user) return <Navigate to="/projects" replace />;
+  if (user) return <Navigate to="/about" replace />;
   return <>{children}</>;
 }
 
@@ -35,9 +36,10 @@ export default function App() {
             <Route path="/projects/:id" element={<ProjectWorkspacePage />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
             <Route path="/projects/:id/leaderboard" element={<LeaderboardPage />} />
+            <Route path="/about" element={<AboutPage />} />
             <Route path="/admin" element={<ProtectedRoute adminOnly><AdminPage /></ProtectedRoute>} />
           </Route>
-          <Route path="*" element={<Navigate to="/projects" replace />} />
+          <Route path="*" element={<Navigate to="/about" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
