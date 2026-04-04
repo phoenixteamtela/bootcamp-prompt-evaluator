@@ -18,6 +18,7 @@ class EvalResultResponse(BaseModel):
     scenario: str = ""
     prompt_inputs: dict = {}
     solution_criteria: list[str] = []
+    rendered_prompt: str | None = None
     output: str
     score: float
     reasoning: str

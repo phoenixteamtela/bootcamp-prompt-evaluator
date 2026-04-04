@@ -9,10 +9,28 @@ from app.config import get_settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from sqlalchemy import update
     from app.database import async_session
+    from app.models.eval_run import EvalRun
+    from app.models.dataset import Dataset
     from app.services.auth_service import get_or_create_seed_admin
+
     async with async_session() as db:
         await get_or_create_seed_admin(db)
+
+        # Mark runs/datasets orphaned by a previous server restart as failed
+        await db.execute(
+            update(EvalRun)
+            .where(EvalRun.status.in_(["pending", "running"]))
+            .values(status="failed", error_message="Interrupted by server restart")
+        )
+        await db.execute(
+            update(Dataset)
+            .where(Dataset.status.in_(["pending", "generating"]))
+            .values(status="failed")
+        )
+        await db.commit()
+
     yield
 
 

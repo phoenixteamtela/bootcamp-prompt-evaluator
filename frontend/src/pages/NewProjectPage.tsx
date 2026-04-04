@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { colors, gradients } from '../theme';
+import Tooltip from '../components/common/Tooltip';
 
 export default function NewProjectPage() {
   const navigate = useNavigate();
@@ -78,17 +79,26 @@ export default function NewProjectPage() {
             <input value={name} onChange={e => setName(e.target.value)} required style={inputStyle} placeholder="e.g., Meal Plan Generator" />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Task Description</label>
+            <label style={{ ...labelStyle, display: 'flex', alignItems: 'center' }}>
+              Task Description
+              <Tooltip text="Describe what your prompt should accomplish. This helps generate relevant test cases." />
+            </label>
             <textarea value={taskDescription} onChange={e => setTaskDescription(e.target.value)} required rows={4} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Describe what the prompt should accomplish..." />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Extra Criteria (optional)</label>
+            <label style={{ ...labelStyle, display: 'flex', alignItems: 'center' }}>
+              Extra Criteria (optional)
+              <Tooltip text="Mandatory requirements every response must meet, regardless of test case. Overrides default grading criteria." />
+            </label>
             <textarea value={extraCriteria} onChange={e => setExtraCriteria(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Mandatory requirements that override all other criteria..." />
           </div>
         </div>
 
         <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.gray[200]}`, padding: 24, marginBottom: 16 }}>
-          <label style={{ ...labelStyle, marginBottom: 12 }}>Prompt Input Variables</label>
+          <label style={{ ...labelStyle, marginBottom: 12, display: 'flex', alignItems: 'center' }}>
+            Prompt Input Variables
+            <Tooltip text="Define dynamic inputs your prompt receives. Each variable becomes a {placeholder} in your prompt template." />
+          </label>
           {inputs.map((input, i) => (
             <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
               <input

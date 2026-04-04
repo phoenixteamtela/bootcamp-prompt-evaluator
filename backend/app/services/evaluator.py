@@ -5,10 +5,13 @@ Same prompt templates and grading rubric.
 """
 
 import json
+import logging
 import re
 from textwrap import dedent
 
 from app.services.llm_service import LLMResponse, chat
+
+logger = logging.getLogger(__name__)
 
 
 def render(template_string: str, variables: dict) -> str:
@@ -105,10 +108,14 @@ def generate_test_case(
 ) -> tuple[dict, LLMResponse]:
     """Generate a single test case from a scenario idea. Returns (test_case, llm_response)."""
 
+    input_variable_reqs = ""
+    for key, value in prompt_inputs_spec.items():
+        val = value.replace("\n", " ")
+        input_variable_reqs += f'- "{key}": {val}\n'
+
     example_prompt_inputs = ""
     for key, value in prompt_inputs_spec.items():
-        val = value.replace("\n", "\\n")
-        example_prompt_inputs += f'"{key}": "EXAMPLE_VALUE", // {val}\n'
+        example_prompt_inputs += f'"{key}": "<realistic, complete content matching description>",\n'
 
     allowed_keys = ", ".join([f'"{key}"' for key in prompt_inputs_spec.keys()])
 
@@ -122,6 +129,11 @@ def generate_test_case(
     <specific_idea>
     {idea}
     </specific_idea>
+
+    <input_variable_requirements>
+    Each prompt_inputs value MUST follow these descriptions exactly:
+    {input_variable_reqs}
+    </input_variable_requirements>
 
     <allowed_input_keys>
     {allowed_keys}
@@ -141,13 +153,14 @@ def generate_test_case(
     - You MUST ONLY use these exact input keys in your prompt_inputs: {allowed_keys}
     - Do NOT add any additional keys to prompt_inputs
     - All keys listed in allowed_input_keys must be included in your response
+    - Each prompt_inputs value MUST be realistic, substantive content that fully matches its variable description above
+    - Input values should be COMPLETE — never truncate or abbreviate. If the description says "sentences", write full sentences. If it says "paragraph", write a full paragraph.
     - Make the test case realistic and practically useful
     - Include measurable, concise solution criteria
     - The solution criteria should ONLY address the direct requirements of the task description and the generated prompt_inputs
     - Avoid over-specifying criteria with requirements that go beyond the core task
     - Keep solution criteria simple, focused, and directly tied to the fundamental task
     - The test case should be tailored to the specific idea provided
-    - Quick to solve without requiring extensive computation or multi-step processing
     - Solvable with no more than 400 tokens of output
     - DO NOT include any fields beyond those specified in the output format
 
@@ -159,6 +172,10 @@ def generate_test_case(
     <sample_specific_idea>
     Testing with a text that contains multiple nested topics and subtopics (e.g., a passage about renewable energy that covers solar power economics, wind turbine technology, and policy implications simultaneously)
     </sample_specific_idea>
+
+    <sample_input_variable_requirements>
+    - "content": A passage of text with at least three complete sentences
+    </sample_input_variable_requirements>
 
     <sample_allowed_input_keys>
     "content"
@@ -176,7 +193,7 @@ def generate_test_case(
     }}
     ```
     </ideal_output>
-    This is ideal output because the solution criteria is concise and doesn't ask for anything outside of the scope of the task description.
+    This is ideal output because the solution criteria is concise and doesn't ask for anything outside of the scope of the task description, and the "content" value is three complete sentences matching the variable description.
     """
 
     rendered_prompt = render(
@@ -185,6 +202,7 @@ def generate_test_case(
             "allowed_keys": allowed_keys,
             "task_description": task_description,
             "idea": idea,
+            "input_variable_reqs": input_variable_reqs,
             "example_prompt_inputs": example_prompt_inputs,
         },
     )
@@ -199,6 +217,7 @@ def generate_test_case(
         model=model,
         system="You are a test case creator specializing in designing evaluation scenarios.",
         temperature=0.7,
+        max_tokens=2000,
         stop_sequences=["```"],
     )
 
@@ -207,17 +226,36 @@ def generate_test_case(
     return test_case, response
 
 
+def _format_inputs(prompt_inputs: dict) -> str:
+    """Format prompt_inputs dict as a readable user message."""
+    parts = []
+    for key, value in prompt_inputs.items():
+        parts.append(f"{key}:\n{value}")
+    return "\n\n".join(parts)
+
+
 def run_prompt_with_template(
     template: str,
     prompt_inputs: dict,
     model: str,
     temperature: float = 1.0,
-) -> tuple[str, LLMResponse]:
-    """Render a prompt template with inputs and call the LLM. Returns (output_text, llm_response)."""
-    rendered = render(template, prompt_inputs)
-    messages = [{"role": "user", "content": rendered}]
-    response = chat(messages, model=model, temperature=temperature)
-    return response.text, response
+) -> tuple[str, str, LLMResponse]:
+    """Run the student's prompt template against test case inputs.
+
+    The template is sent as the system message (instructions).
+    The test case prompt_inputs are sent as the user message (data).
+    If the template contains {variable} placeholders, those are also
+    substituted inline for students who prefer that style.
+
+    Returns (output_text, rendered_prompt, llm_response).
+    """
+    system_prompt = render(template, prompt_inputs)
+    user_message = _format_inputs(prompt_inputs)
+    rendered = f"[System]\n{system_prompt}\n\n[User]\n{user_message}"
+
+    messages = [{"role": "user", "content": user_message}]
+    response = chat(messages, model=model, system=system_prompt, temperature=temperature)
+    return response.text, rendered, response
 
 
 def grade_output(

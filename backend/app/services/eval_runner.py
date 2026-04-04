@@ -219,7 +219,7 @@ async def run_evaluation_background(
                     return
 
                 # Step 1: Run prompt
-                output_text, run_response = await loop.run_in_executor(
+                output_text, rendered_prompt, run_response = await loop.run_in_executor(
                     _executor,
                     evaluator.run_prompt_with_template,
                     template,
@@ -264,6 +264,7 @@ async def run_evaluation_background(
                 eval_result = EvalResult(
                     eval_run_id=run_id,
                     test_case_id=tc.id,
+                    rendered_prompt=rendered_prompt,
                     output=output_text,
                     score=grade["score"],
                     reasoning=grade["reasoning"],

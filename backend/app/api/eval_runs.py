@@ -48,6 +48,7 @@ async def _run_response(db: AsyncSession, run: EvalRun, include_results: bool = 
                 scenario=tc.scenario if tc else "",
                 prompt_inputs=tc.prompt_inputs if tc else {},
                 solution_criteria=tc.solution_criteria if tc else [],
+                rendered_prompt=er.rendered_prompt,
                 output=er.output,
                 score=er.score,
                 reasoning=er.reasoning,

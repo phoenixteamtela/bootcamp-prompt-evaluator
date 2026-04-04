@@ -102,7 +102,14 @@ def _call_openai(
     if system:
         oai_messages.append({"role": "system", "content": system})
 
-    for msg in messages:
+    # OpenAI doesn't support Anthropic-style assistant prefill.
+    # Drop the trailing assistant message and its paired stop_sequences,
+    # since that pattern is designed for Anthropic's continuation API.
+    had_prefill = messages and messages[-1]["role"] == "assistant"
+    effective_messages = messages[:-1] if had_prefill else messages
+    effective_stop = None if had_prefill else stop_sequences
+
+    for msg in effective_messages:
         oai_messages.append({"role": msg["role"], "content": msg["content"]})
 
     params: dict = {
@@ -111,8 +118,8 @@ def _call_openai(
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
-    if stop_sequences:
-        params["stop"] = stop_sequences
+    if effective_stop:
+        params["stop"] = effective_stop
 
     response = client.chat.completions.create(**params)
 
@@ -120,10 +127,20 @@ def _call_openai(
     text = choice.message.content or ""
 
     # If stop sequence was hit, the text may include the stop sequence for OpenAI — strip it
-    if stop_sequences:
-        for seq in stop_sequences:
+    if effective_stop:
+        for seq in effective_stop:
             if text.endswith(seq):
                 text = text[: -len(seq)]
+
+    # Strip markdown code fences that OpenAI models wrap JSON responses in
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        newline = stripped.find("\n")
+        if newline != -1:
+            stripped = stripped[newline + 1:]
+    if stripped.endswith("```"):
+        stripped = stripped[:-3]
+    text = stripped.strip()
 
     return LLMResponse(
         text=text,

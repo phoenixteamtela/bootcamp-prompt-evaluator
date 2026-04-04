@@ -15,6 +15,7 @@ class EvalResult(Base):
     eval_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("eval_runs.id"), nullable=False, index=True)
     test_case_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("test_cases.id"), nullable=False)
 
+    rendered_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
     output: Mapped[str] = mapped_column(Text, nullable=False)
     score: Mapped[float] = mapped_column(Float, nullable=False)
     reasoning: Mapped[str] = mapped_column(Text, nullable=False)
