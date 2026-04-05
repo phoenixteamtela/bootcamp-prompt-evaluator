@@ -10,9 +10,8 @@ const TEMPLATE_STEPS = [
 ];
 
 const CONVERSATION_STEPS = [
-  { label: 'Task Overview', icon: '1' },
-  { label: 'Write & Run', icon: '2' },
-  { label: 'Results', icon: '3' },
+  { label: 'Write & Run', icon: '1' },
+  { label: 'Results', icon: '2' },
 ];
 
 function getTemplateStepHint(index: number, state: WorkspaceState): string {
@@ -39,12 +38,10 @@ function getTemplateStepHint(index: number, state: WorkspaceState): string {
 function getConversationStepHint(index: number, state: WorkspaceState): string {
   switch (index) {
     case 0:
-      return 'Defined';
-    case 1:
       if (state.activeRunId && !state.evalSSE.done) return 'Running...';
       if (state.selectedVersion) return `v${state.selectedVersion.version_number}`;
       return state.versions.length > 0 ? `${state.versions.length} version${state.versions.length !== 1 ? 's' : ''}` : 'No versions';
-    case 2:
+    case 1:
       return state.evalRuns.length > 0 ? `${state.evalRuns.length} run${state.evalRuns.length !== 1 ? 's' : ''}` : 'No runs';
     default:
       return '';

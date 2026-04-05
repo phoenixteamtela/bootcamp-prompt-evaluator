@@ -132,7 +132,7 @@ export default function ConversationResultsStep({ state, actions }: Props) {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => actions.downloadRun(viewingRun.id)} style={btnStyle('secondary')}>Download Run</button>
-          <button onClick={() => actions.goToStep(1)} style={btnStyle('primary')}>Edit Prompt</button>
+          <button onClick={() => actions.goToStep(0)} style={btnStyle('primary')}>Edit Prompt</button>
         </div>
       </div>
 

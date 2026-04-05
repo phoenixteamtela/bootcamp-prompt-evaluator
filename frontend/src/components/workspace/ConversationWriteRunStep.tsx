@@ -12,13 +12,20 @@ const btnStyle = (variant: 'primary' | 'secondary'): React.CSSProperties => ({
   fontSize: 13, fontWeight: 600, cursor: 'pointer',
 });
 
+const PILLARS = [
+  { name: 'Clarity & Directness', hint: 'Clear task, action verbs, persona' },
+  { name: 'Specificity', hint: 'Guidelines, output qualities, constraints' },
+  { name: 'Examples', hint: 'Sample I/O, edge cases, labeled sections' },
+  { name: 'Structure', hint: 'XML tags, delimiters, logical organization' },
+];
+
 interface Props {
   state: WorkspaceState;
   actions: WorkspaceActions;
 }
 
 export default function ConversationWriteRunStep({ state, actions }: Props) {
-  const { versions, selectedVersion, models, evalSSE, activeRunId } = state;
+  const { project, versions, selectedVersion, models, evalSSE, activeRunId } = state;
   const hasVersions = versions.length > 0;
 
   const [editingTemplate, setEditingTemplate] = useState(selectedVersion?.template || '');
@@ -28,6 +35,7 @@ export default function ConversationWriteRunStep({ state, actions }: Props) {
   const [gradingModel, setGradingModel] = useState('claude-haiku-4-5-20251001');
   const [temperature, setTemperature] = useState(1.0);
   const [running, setRunning] = useState(false);
+  const [showRubric, setShowRubric] = useState(false);
 
   useEffect(() => {
     if (selectedVersion) {
@@ -48,7 +56,6 @@ export default function ConversationWriteRunStep({ state, actions }: Props) {
   };
 
   const handleSaveAndRun = async () => {
-    // Save version first if editing
     let version = selectedVersion;
     if (isEditing) {
       version = await actions.saveVersion(editingTemplate, newVersionLabel || null);
@@ -69,11 +76,10 @@ export default function ConversationWriteRunStep({ state, actions }: Props) {
   // Auto-advance when eval completes
   useEffect(() => {
     if (evalSSE.done && activeRunId) {
-      actions.goToStep(2);
+      actions.goToStep(1);
     }
   }, [evalSSE.done, activeRunId, actions]);
 
-  // Detect SSE progress
   const isRunning = !!activeRunId && !evalSSE.done;
   const lastEvent = evalSSE.lastEvent;
   const lastScore = lastEvent?.event === 'result' ? (lastEvent.data as { score?: number }).score : null;
@@ -88,6 +94,53 @@ export default function ConversationWriteRunStep({ state, actions }: Props) {
 
   const editor = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Task context */}
+      <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.gray[200]}`, padding: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: colors.gray[400], textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Your Task</div>
+            <div style={{ fontSize: 14, color: colors.gray[700], lineHeight: 1.6 }}>
+              {project.task_description}
+            </div>
+            {project.extra_criteria && (
+              <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 6, background: colors.warningBg, fontSize: 12, color: colors.warning, lineHeight: 1.5 }}>
+                <strong>Extra criteria:</strong> {project.extra_criteria}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => setShowRubric(!showRubric)}
+            style={{
+              background: 'none', border: `1px solid ${colors.gray[200]}`,
+              borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600,
+              color: showRubric ? colors.orange : colors.gray[500], cursor: 'pointer',
+              marginLeft: 12, whiteSpace: 'nowrap', flexShrink: 0,
+            }}
+          >
+            {showRubric ? 'Hide Rubric' : 'View Rubric'}
+          </button>
+        </div>
+
+        {showRubric && (
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${colors.gray[100]}` }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: colors.gray[400], textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+              Grading Rubric — 4 Pillars (each 0-2.5 pts, total 1-10)
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+              {PILLARS.map(p => (
+                <div key={p.name} style={{
+                  padding: '8px 12px', borderRadius: 6, background: colors.gray[50],
+                  borderLeft: `3px solid ${colors.orange}`,
+                }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: colors.navy }}>{p.name}</div>
+                  <div style={{ fontSize: 11, color: colors.gray[500], marginTop: 2 }}>{p.hint}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Prompt Editor */}
       <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.gray[200]}`, padding: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -107,7 +160,7 @@ export default function ConversationWriteRunStep({ state, actions }: Props) {
         </div>
         {!hasVersions && (
           <p style={{ fontSize: 13, color: colors.gray[500], margin: '0 0 12px', lineHeight: 1.5 }}>
-            Write a plain prompt for the AI. No variables needed — just write exactly what you want the AI to do. Your prompt will be scored on Clarity, Specificity, Examples, and Structure.
+            Write a plain prompt for the AI. No variables needed — just write exactly what you want the AI to do.
           </p>
         )}
         <textarea
@@ -153,7 +206,6 @@ export default function ConversationWriteRunStep({ state, actions }: Props) {
           </div>
         </div>
 
-        {/* Progress / Run button */}
         {isRunning ? (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: colors.gray[600], marginBottom: 6 }}>

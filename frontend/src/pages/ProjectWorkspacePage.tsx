@@ -9,7 +9,6 @@ import DatasetStep from '../components/workspace/DatasetStep';
 import PromptStep from '../components/workspace/PromptStep';
 import RunEvalStep from '../components/workspace/RunEvalStep';
 import ResultsStep from '../components/workspace/ResultsStep';
-import ConversationDefineStep from '../components/workspace/ConversationDefineStep';
 import ConversationWriteRunStep from '../components/workspace/ConversationWriteRunStep';
 import ConversationResultsStep from '../components/workspace/ConversationResultsStep';
 import type { Project, Version, Dataset, EvalRun, Model, WorkspaceState, WorkspaceActions } from '../types/workspace';
@@ -23,9 +22,9 @@ function computeTemplateInitialStep(datasets: Dataset[], versions: Version[], ev
 }
 
 function computeConversationInitialStep(versions: Version[], evalRuns: EvalRun[]): number {
-  if (versions.length === 0) return 1;
-  if (evalRuns.length === 0) return 1;
-  return 2;
+  if (versions.length === 0) return 0;
+  if (evalRuns.length === 0) return 0;
+  return 1;
 }
 
 export default function ProjectWorkspacePage() {
@@ -189,9 +188,8 @@ export default function ProjectWorkspacePage() {
 
       {isConversation ? (
         <>
-          {activeStep === 0 && <ConversationDefineStep state={state} actions={actions} />}
-          {activeStep === 1 && <ConversationWriteRunStep state={state} actions={actions} />}
-          {activeStep === 2 && <ConversationResultsStep state={state} actions={actions} />}
+          {activeStep === 0 && <ConversationWriteRunStep state={state} actions={actions} />}
+          {activeStep === 1 && <ConversationResultsStep state={state} actions={actions} />}
         </>
       ) : (
         <>
