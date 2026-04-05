@@ -16,7 +16,7 @@ interface Props {
 
 export default function DefineTaskStep({ state, actions }: Props) {
   const { project } = state;
-  const inputKeys = Object.keys(project.prompt_inputs_spec);
+  const inputKeys = Object.keys(project.prompt_inputs_spec ?? {});
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -45,23 +45,34 @@ export default function DefineTaskStep({ state, actions }: Props) {
           <p style={{ color: colors.gray[400], fontSize: 13 }}>No input variables defined.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {inputKeys.map(key => (
-              <div key={key} style={{
-                display: 'flex', gap: 12, alignItems: 'baseline',
-                padding: '10px 14px', borderRadius: 8, background: colors.gray[50],
-              }}>
-                <code style={{
-                  fontSize: 13, fontWeight: 600, color: colors.orange,
-                  background: colors.white, padding: '2px 8px', borderRadius: 4,
-                  border: `1px solid ${colors.gray[200]}`,
+            {inputKeys.map(key => {
+              const spec = (project.prompt_inputs_spec ?? {})[key];
+              const typeLabel = spec.type?.replace(/_/g, ' ').replace(/\busd\b/i, '(USD)') || 'short text';
+              return (
+                <div key={key} style={{
+                  display: 'flex', gap: 12, alignItems: 'baseline',
+                  padding: '10px 14px', borderRadius: 8, background: colors.gray[50],
                 }}>
-                  {`{${key}}`}
-                </code>
-                <span style={{ fontSize: 13, color: colors.gray[600] }}>
-                  {project.prompt_inputs_spec[key]}
-                </span>
-              </div>
-            ))}
+                  <code style={{
+                    fontSize: 13, fontWeight: 600, color: colors.orange,
+                    background: colors.white, padding: '2px 8px', borderRadius: 4,
+                    border: `1px solid ${colors.gray[200]}`,
+                  }}>
+                    {`{${key}}`}
+                  </code>
+                  <span style={{
+                    fontSize: 11, fontWeight: 600, color: colors.navy,
+                    background: '#E8832A1A', padding: '2px 8px', borderRadius: 10,
+                    textTransform: 'capitalize', whiteSpace: 'nowrap',
+                  }}>
+                    {typeLabel}
+                  </span>
+                  <span style={{ fontSize: 13, color: colors.gray[600] }}>
+                    {spec.description}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

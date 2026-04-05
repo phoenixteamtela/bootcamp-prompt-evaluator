@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, ReactNode } from 'react';
+import { useState, useRef, useLayoutEffect, ReactNode } from 'react';
 import { colors } from '../../theme';
 
 interface TooltipProps {
@@ -13,18 +13,14 @@ export default function Tooltip({ text, position = 'bottom', children }: Tooltip
   const wrapperRef = useRef<HTMLSpanElement>(null);
   const [nudge, setNudge] = useState(0);
 
-  const clamp = useCallback(() => {
-    if (!bubbleRef.current) return;
+  useLayoutEffect(() => {
+    if (!visible || !bubbleRef.current) return;
     const rect = bubbleRef.current.getBoundingClientRect();
     let shift = 0;
     if (rect.left < 8) shift = 8 - rect.left;
     else if (rect.right > window.innerWidth - 8) shift = window.innerWidth - 8 - rect.right;
-    if (shift !== nudge) setNudge(shift);
-  }, [nudge]);
-
-  useEffect(() => {
-    if (visible) clamp();
-  }, [visible, clamp]);
+    setNudge(shift);
+  }, [visible]);
 
   const positionStyle: React.CSSProperties =
     position === 'top' ? { bottom: '100%', left: '50%', transform: `translateX(calc(-50% + ${nudge}px))`, marginBottom: 6 } :

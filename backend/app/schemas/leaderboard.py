@@ -11,3 +11,4 @@ class LeaderboardEntry(BaseModel):
     model: str | None = None
     run_date: str | None = None
     project_name: str | None = None
+    mode: str | None = None

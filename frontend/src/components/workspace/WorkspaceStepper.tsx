@@ -1,7 +1,7 @@
 import { colors, gradients } from '../../theme';
 import type { WorkspaceState } from '../../types/workspace';
 
-const steps = [
+const TEMPLATE_STEPS = [
   { label: 'Define Task', icon: '1' },
   { label: 'Generate Dataset', icon: '2' },
   { label: 'Write Prompt', icon: '3' },
@@ -9,7 +9,13 @@ const steps = [
   { label: 'Analyze Results', icon: '5' },
 ];
 
-function getStepHint(index: number, state: WorkspaceState): string {
+const CONVERSATION_STEPS = [
+  { label: 'Task Overview', icon: '1' },
+  { label: 'Write & Run', icon: '2' },
+  { label: 'Results', icon: '3' },
+];
+
+function getTemplateStepHint(index: number, state: WorkspaceState): string {
   const readyDatasets = state.datasets.filter(d => d.status === 'ready');
   switch (index) {
     case 0:
@@ -30,6 +36,21 @@ function getStepHint(index: number, state: WorkspaceState): string {
   }
 }
 
+function getConversationStepHint(index: number, state: WorkspaceState): string {
+  switch (index) {
+    case 0:
+      return 'Defined';
+    case 1:
+      if (state.activeRunId && !state.evalSSE.done) return 'Running...';
+      if (state.selectedVersion) return `v${state.selectedVersion.version_number}`;
+      return state.versions.length > 0 ? `${state.versions.length} version${state.versions.length !== 1 ? 's' : ''}` : 'No versions';
+    case 2:
+      return state.evalRuns.length > 0 ? `${state.evalRuns.length} run${state.evalRuns.length !== 1 ? 's' : ''}` : 'No runs';
+    default:
+      return '';
+  }
+}
+
 interface Props {
   activeStep: number;
   state: WorkspaceState;
@@ -37,6 +58,10 @@ interface Props {
 }
 
 export default function WorkspaceStepper({ activeStep, state, onStepClick }: Props) {
+  const isConversation = state.project.mode === 'conversation';
+  const steps = isConversation ? CONVERSATION_STEPS : TEMPLATE_STEPS;
+  const getHint = isConversation ? getConversationStepHint : getTemplateStepHint;
+
   return (
     <div style={{ position: 'relative', marginBottom: 28, padding: '0 24px' }}>
       {/* Connecting line */}
@@ -53,7 +78,7 @@ export default function WorkspaceStepper({ activeStep, state, onStepClick }: Pro
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(5, 1fr)',
+        gridTemplateColumns: `repeat(${steps.length}, 1fr)`,
         gap: 8,
         position: 'relative',
         zIndex: 1,
@@ -61,7 +86,7 @@ export default function WorkspaceStepper({ activeStep, state, onStepClick }: Pro
         {steps.map((step, i) => {
           const isActive = i === activeStep;
           const hasData = i < activeStep;
-          const hint = getStepHint(i, state);
+          const hint = getHint(i, state);
 
           let circleBg: string;
           let circleColor: string;

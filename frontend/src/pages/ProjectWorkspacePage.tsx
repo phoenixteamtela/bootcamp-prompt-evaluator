@@ -9,14 +9,23 @@ import DatasetStep from '../components/workspace/DatasetStep';
 import PromptStep from '../components/workspace/PromptStep';
 import RunEvalStep from '../components/workspace/RunEvalStep';
 import ResultsStep from '../components/workspace/ResultsStep';
+import ConversationDefineStep from '../components/workspace/ConversationDefineStep';
+import ConversationWriteRunStep from '../components/workspace/ConversationWriteRunStep';
+import ConversationResultsStep from '../components/workspace/ConversationResultsStep';
 import type { Project, Version, Dataset, EvalRun, Model, WorkspaceState, WorkspaceActions } from '../types/workspace';
 
-function computeInitialStep(datasets: Dataset[], versions: Version[], evalRuns: EvalRun[]): number {
+function computeTemplateInitialStep(datasets: Dataset[], versions: Version[], evalRuns: EvalRun[]): number {
   const readyDatasets = datasets.filter(d => d.status === 'ready');
   if (readyDatasets.length === 0) return 1;
   if (versions.length === 0) return 2;
   if (evalRuns.length === 0) return 3;
   return 4;
+}
+
+function computeConversationInitialStep(versions: Version[], evalRuns: EvalRun[]): number {
+  if (versions.length === 0) return 1;
+  if (evalRuns.length === 0) return 1;
+  return 2;
 }
 
 export default function ProjectWorkspacePage() {
@@ -47,10 +56,13 @@ export default function ProjectWorkspacePage() {
 
   const load = useCallback(async () => {
     if (!projectId) return;
+
+    const isConversation = project?.mode === 'conversation';
+
     const [p, v, d, r, m] = await Promise.all([
       api.get<Project>(`/api/projects/${projectId}`),
       api.get<Version[]>(`/api/projects/${projectId}/versions`),
-      api.get<Dataset[]>(`/api/projects/${projectId}/datasets`),
+      isConversation ? Promise.resolve([] as Dataset[]) : api.get<Dataset[]>(`/api/projects/${projectId}/datasets`),
       api.get<EvalRun[]>(`/api/projects/${projectId}/eval-runs`),
       api.get<{ models: Model[] }>('/api/models'),
     ]);
@@ -62,6 +74,10 @@ export default function ProjectWorkspacePage() {
     if (!selectedVersion && v.length > 0) {
       setSelectedVersion(v[0]);
     }
+    const readyDatasets = d.filter(ds => ds.status === 'ready');
+    if (!selectedDatasetId && readyDatasets.length > 0) {
+      setSelectedDatasetId(readyDatasets[0].id);
+    }
     // Reconnect SSE for in-progress run
     const inProgressRun = r.find(run => run.status === 'running' || run.status === 'pending');
     if (inProgressRun && !activeRunId) setActiveRunId(inProgressRun.id);
@@ -70,16 +86,24 @@ export default function ProjectWorkspacePage() {
     if (genDataset && !generatingDatasetId) setGeneratingDatasetId(genDataset.id);
     // Smart initial step (only on first load)
     if (!initialStepSet) {
-      setActiveStep(computeInitialStep(d, v, r));
+      if (p.mode === 'conversation') {
+        setActiveStep(computeConversationInitialStep(v, r));
+      } else {
+        setActiveStep(computeTemplateInitialStep(d, v, r));
+      }
       setInitialStepSet(true);
     }
-  }, [projectId, selectedVersion, activeRunId, generatingDatasetId, initialStepSet]);
+  }, [projectId, selectedVersion, activeRunId, generatingDatasetId, initialStepSet, project?.mode]);
 
   useEffect(() => { load(); }, [load]);
 
   // Reload when SSE completes
   useEffect(() => {
-    if (datasetSSE.done) { load(); setGeneratingDatasetId(null); }
+    if (datasetSSE.done) {
+      if (generatingDatasetId) setSelectedDatasetId(generatingDatasetId);
+      load();
+      setGeneratingDatasetId(null);
+    }
   }, [datasetSSE.done, load]);
 
   useEffect(() => {
@@ -107,11 +131,14 @@ export default function ProjectWorkspacePage() {
       });
       setGeneratingDatasetId(d.id);
     },
-    runEval: async (datasetId: string, versionId: string, runModel: string, gradingModel: string, temperature: number) => {
+    runEval: async (datasetId: string | null, versionId: string, runModel: string, gradingModel: string, temperature: number) => {
       if (!projectId) return;
       const run = await api.post<EvalRun>(`/api/projects/${projectId}/eval-runs`, {
-        prompt_version_id: versionId, dataset_id: datasetId,
-        run_model: runModel, grading_model: gradingModel, temperature,
+        prompt_version_id: versionId,
+        dataset_id: datasetId,
+        run_model: runModel,
+        grading_model: gradingModel,
+        temperature,
       });
       setActiveRunId(run.id);
     },
@@ -139,24 +166,42 @@ export default function ProjectWorkspacePage() {
     evalSSE: { lastEvent: evalSSE.lastEvent, done: evalSSE.done, connected: evalSSE.connected },
   };
 
+  const isConversation = project.mode === 'conversation';
+
   return (
     <div>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Link to="/projects" style={{ color: colors.gray[400], textDecoration: 'none', fontSize: 13 }}>Projects</Link>
-          <span style={{ color: colors.gray[300], margin: '0 8px' }}>/</span>
+          <span style={{ color: colors.gray[300] }}>/</span>
           <h1 style={{ color: colors.navy, margin: 0, fontSize: 22, display: 'inline' }}>{project.name}</h1>
+          <span style={{
+            fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
+            padding: '2px 6px', borderRadius: 4,
+            background: isConversation ? 'rgba(232,131,42,0.1)' : colors.gray[100],
+            color: isConversation ? colors.orange : colors.gray[500],
+          }}>{project.mode}</span>
         </div>
       </div>
 
       <WorkspaceStepper activeStep={activeStep} state={state} onStepClick={setActiveStep} />
 
-      {activeStep === 0 && <DefineTaskStep state={state} actions={actions} />}
-      {activeStep === 1 && <DatasetStep state={state} actions={actions} />}
-      {activeStep === 2 && <PromptStep state={state} actions={actions} />}
-      {activeStep === 3 && <RunEvalStep state={state} actions={actions} />}
-      {activeStep === 4 && <ResultsStep state={state} actions={actions} />}
+      {isConversation ? (
+        <>
+          {activeStep === 0 && <ConversationDefineStep state={state} actions={actions} />}
+          {activeStep === 1 && <ConversationWriteRunStep state={state} actions={actions} />}
+          {activeStep === 2 && <ConversationResultsStep state={state} actions={actions} />}
+        </>
+      ) : (
+        <>
+          {activeStep === 0 && <DefineTaskStep state={state} actions={actions} />}
+          {activeStep === 1 && <DatasetStep state={state} actions={actions} />}
+          {activeStep === 2 && <PromptStep state={state} actions={actions} />}
+          {activeStep === 3 && <RunEvalStep state={state} actions={actions} />}
+          {activeStep === 4 && <ResultsStep state={state} actions={actions} />}
+        </>
+      )}
     </div>
   );
 }

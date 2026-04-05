@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 class EvalRunCreate(BaseModel):
     prompt_version_id: str
-    dataset_id: str
+    dataset_id: str | None = None
     run_model: str = "claude-haiku-4-5-20251001"
     grading_model: str = "claude-haiku-4-5-20251001"
     temperature: float = 1.0
@@ -14,7 +14,7 @@ class EvalRunCreate(BaseModel):
 
 class EvalResultResponse(BaseModel):
     id: str
-    test_case_id: str
+    test_case_id: str | None = None
     scenario: str = ""
     prompt_inputs: dict = {}
     solution_criteria: list[str] = []
@@ -24,6 +24,7 @@ class EvalResultResponse(BaseModel):
     reasoning: str
     strengths: list[str]
     weaknesses: list[str]
+    pillar_scores: dict | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -33,7 +34,7 @@ class EvalRunResponse(BaseModel):
     id: str
     project_id: str
     prompt_version_id: str
-    dataset_id: str
+    dataset_id: str | None = None
     user_id: str
     run_model: str
     grading_model: str

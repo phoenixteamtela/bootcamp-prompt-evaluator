@@ -16,7 +16,13 @@ from app.models.prompt_version import PromptVersion
 from app.models.test_case import TestCase
 from app.models.user import User
 from app.schemas.eval_run import EvalResultResponse, EvalRunCreate, EvalRunResponse
-from app.services.eval_runner import cancel_run, run_evaluation_background, subscribe, unsubscribe
+from app.services.eval_runner import (
+    cancel_run,
+    run_conversation_evaluation_background,
+    run_evaluation_background,
+    subscribe,
+    unsubscribe,
+)
 
 router = APIRouter()
 
@@ -39,12 +45,14 @@ async def _run_response(db: AsyncSession, run: EvalRun, include_results: bool = 
         )
         eval_results = r_result.scalars().all()
         for er in eval_results:
-            # Get test case data for enrichment
-            tc_result = await db.execute(select(TestCase).where(TestCase.id == er.test_case_id))
-            tc = tc_result.scalar_one_or_none()
+            # Get test case data for enrichment (may be null for conversation mode)
+            tc = None
+            if er.test_case_id:
+                tc_result = await db.execute(select(TestCase).where(TestCase.id == er.test_case_id))
+                tc = tc_result.scalar_one_or_none()
             results.append(EvalResultResponse(
                 id=str(er.id),
-                test_case_id=str(er.test_case_id),
+                test_case_id=str(er.test_case_id) if er.test_case_id else None,
                 scenario=tc.scenario if tc else "",
                 prompt_inputs=tc.prompt_inputs if tc else {},
                 solution_criteria=tc.solution_criteria if tc else [],
@@ -54,6 +62,7 @@ async def _run_response(db: AsyncSession, run: EvalRun, include_results: bool = 
                 reasoning=er.reasoning,
                 strengths=er.strengths,
                 weaknesses=er.weaknesses,
+                pillar_scores=er.pillar_scores,
                 created_at=er.created_at,
             ))
 
@@ -61,7 +70,7 @@ async def _run_response(db: AsyncSession, run: EvalRun, include_results: bool = 
         id=str(run.id),
         project_id=str(run.project_id),
         prompt_version_id=str(run.prompt_version_id),
-        dataset_id=str(run.dataset_id),
+        dataset_id=str(run.dataset_id) if run.dataset_id else None,
         user_id=str(run.user_id),
         run_model=run.run_model,
         grading_model=run.grading_model,
@@ -96,7 +105,7 @@ async def create_eval_run(
     if project.user_id != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    # Verify version and dataset belong to project
+    # Verify version belongs to project
     v_result = await db.execute(
         select(PromptVersion).where(
             PromptVersion.id == uuid.UUID(body.prompt_version_id),
@@ -107,37 +116,72 @@ async def create_eval_run(
     if not version:
         raise HTTPException(status_code=404, detail="Prompt version not found")
 
-    eval_run = EvalRun(
-        project_id=pid,
-        prompt_version_id=uuid.UUID(body.prompt_version_id),
-        dataset_id=uuid.UUID(body.dataset_id),
-        user_id=current_user.id,
-        run_model=body.run_model,
-        grading_model=body.grading_model,
-        temperature=body.temperature,
-        extra_criteria=body.extra_criteria or project.extra_criteria,
-        status="pending",
-    )
-    db.add(eval_run)
-    await db.flush()
-    await db.commit()
-
-    # Launch background evaluation
-    asyncio.create_task(
-        run_evaluation_background(
-            run_id=eval_run.id,
+    if project.mode == "conversation":
+        # Conversation mode: no dataset required
+        eval_run = EvalRun(
             project_id=pid,
-            prompt_version_id=version.id,
-            dataset_id=uuid.UUID(body.dataset_id),
+            prompt_version_id=uuid.UUID(body.prompt_version_id),
+            dataset_id=None,
             user_id=current_user.id,
-            template=version.template,
-            task_description=project.task_description,
-            extra_criteria=eval_run.extra_criteria,
             run_model=body.run_model,
             grading_model=body.grading_model,
             temperature=body.temperature,
+            extra_criteria=body.extra_criteria or project.extra_criteria,
+            status="pending",
         )
-    )
+        db.add(eval_run)
+        await db.flush()
+        await db.commit()
+
+        asyncio.create_task(
+            run_conversation_evaluation_background(
+                run_id=eval_run.id,
+                project_id=pid,
+                prompt_version_id=version.id,
+                user_id=current_user.id,
+                prompt_text=version.template,
+                task_description=project.task_description,
+                extra_criteria=eval_run.extra_criteria,
+                run_model=body.run_model,
+                grading_model=body.grading_model,
+                temperature=body.temperature,
+            )
+        )
+    else:
+        # Template mode: dataset required
+        if not body.dataset_id:
+            raise HTTPException(status_code=400, detail="dataset_id is required for template projects")
+
+        eval_run = EvalRun(
+            project_id=pid,
+            prompt_version_id=uuid.UUID(body.prompt_version_id),
+            dataset_id=uuid.UUID(body.dataset_id),
+            user_id=current_user.id,
+            run_model=body.run_model,
+            grading_model=body.grading_model,
+            temperature=body.temperature,
+            extra_criteria=body.extra_criteria or project.extra_criteria,
+            status="pending",
+        )
+        db.add(eval_run)
+        await db.flush()
+        await db.commit()
+
+        asyncio.create_task(
+            run_evaluation_background(
+                run_id=eval_run.id,
+                project_id=pid,
+                prompt_version_id=version.id,
+                dataset_id=uuid.UUID(body.dataset_id),
+                user_id=current_user.id,
+                template=version.template,
+                task_description=project.task_description,
+                extra_criteria=eval_run.extra_criteria,
+                run_model=body.run_model,
+                grading_model=body.grading_model,
+                temperature=body.temperature,
+            )
+        )
 
     return await _run_response(db, eval_run)
 

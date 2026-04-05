@@ -13,7 +13,7 @@ class EvalResult(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     eval_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("eval_runs.id"), nullable=False, index=True)
-    test_case_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("test_cases.id"), nullable=False)
+    test_case_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("test_cases.id"), nullable=True)
 
     rendered_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
     output: Mapped[str] = mapped_column(Text, nullable=False)
@@ -21,6 +21,7 @@ class EvalResult(Base):
     reasoning: Mapped[str] = mapped_column(Text, nullable=False)
     strengths: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     weaknesses: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    pillar_scores: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

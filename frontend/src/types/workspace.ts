@@ -1,8 +1,14 @@
+export interface InputVarSpec {
+  description: string;
+  type: string;
+}
+
 export interface Project {
   id: string;
   name: string;
+  mode: 'template' | 'conversation';
   task_description: string;
-  prompt_inputs_spec: Record<string, string>;
+  prompt_inputs_spec: Record<string, InputVarSpec> | null;
   extra_criteria: string | null;
 }
 
@@ -30,6 +36,13 @@ export interface Dataset {
   test_cases: TestCase[];
 }
 
+export interface PillarScores {
+  clarity: number;
+  specificity: number;
+  examples: number;
+  structure: number;
+}
+
 export interface EvalRun {
   id: string;
   status: string;
@@ -43,6 +56,7 @@ export interface EvalRun {
   version_number: number | null;
   version_label: string | null;
   prompt_version_id: string;
+  dataset_id: string | null;
   created_at: string;
   error_message: string | null;
   results: EvalResult[];
@@ -50,6 +64,7 @@ export interface EvalRun {
 
 export interface EvalResult {
   id: string;
+  test_case_id: string | null;
   scenario: string;
   prompt_inputs: Record<string, string>;
   solution_criteria: string[];
@@ -59,6 +74,7 @@ export interface EvalResult {
   reasoning: string;
   strengths: string[];
   weaknesses: string[];
+  pillar_scores: PillarScores | null;
 }
 
 export interface Model {
@@ -95,7 +111,7 @@ export interface WorkspaceActions {
   reload: () => Promise<void>;
   saveVersion: (template: string, label: string | null) => Promise<Version>;
   generateDataset: (name: string, numCases: number, model: string) => Promise<void>;
-  runEval: (datasetId: string, versionId: string, runModel: string, gradingModel: string, temperature: number) => Promise<void>;
+  runEval: (datasetId: string | null, versionId: string, runModel: string, gradingModel: string, temperature: number) => Promise<void>;
   viewRun: (runId: string) => Promise<EvalRun>;
   downloadProject: () => void;
   downloadRun: (runId: string) => void;

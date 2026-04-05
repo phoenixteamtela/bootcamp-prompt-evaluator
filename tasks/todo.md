@@ -51,6 +51,31 @@
 - [x] .gitignore
 - [x] .env.example
 
+## Phase 6: Conversation Mode ✅
+- [x] Migration 003: add `mode` column to projects, make `dataset_id`/`test_case_id`/`prompt_inputs_spec` nullable, add `pillar_scores` to eval_results
+- [x] Updated Project model (mode column, nullable prompt_inputs_spec)
+- [x] Updated EvalRun model (nullable dataset_id)
+- [x] Updated EvalResult model (nullable test_case_id, pillar_scores JSON)
+- [x] Updated schemas: ProjectCreate/Response (mode field, validators), EvalRunCreate/Response (optional dataset_id), EvalResultResponse (pillar_scores), LeaderboardEntry (mode)
+- [x] Added `run_conversation_prompt()` to evaluator.py — plain prompt execution
+- [x] Added `grade_conversation_prompt()` to evaluator.py — PPT rubric with four pillars (Clarity, Specificity, Examples, Structure), each 0-2.5
+- [x] Added `run_conversation_evaluation_background()` to eval_runner.py — single-shot eval with SSE
+- [x] Updated projects API — mode on create, nullable spec in response
+- [x] Updated eval_runs API — branch on project.mode, conversation skips dataset_id
+- [x] Updated leaderboard API — `?mode=` query param, join Project for filtering, mode in response
+- [x] Updated frontend types (mode, nullable fields, PillarScores interface)
+- [x] NewProjectPage — mode toggle (Template / Conversation), conditional form sections
+- [x] ProjectsPage — mode badge on project cards
+- [x] WorkspaceStepper — dual step arrays (5 for template, 3 for conversation)
+- [x] ConversationDefineStep — task overview + rubric reference
+- [x] ConversationWriteRunStep — prompt editor + model config + Save & Run + SSE progress
+- [x] ConversationResultsStep — overall score + pillar bars + strengths/weaknesses + prompt/output
+- [x] ProjectWorkspacePage — mode-aware step routing
+- [x] LeaderboardPage — mode filter tabs (All / Template / Conversation)
+- [x] Seed script — added "Customer Complaint Response" conversation project, mode branching
+- [x] TypeScript compiles clean (npx tsc --noEmit)
+- [x] Python files compile clean (py_compile)
+
 ## Verification
 - [ ] docker-compose up — all services start
 - [ ] Admin login with admin/admin123
@@ -59,3 +84,7 @@
 - [ ] Leaderboard populates
 - [ ] Export/download works
 - [ ] Railway deployment
+- [ ] alembic upgrade head succeeds, existing projects get mode='template'
+- [ ] Create conversation project → write prompt → run eval → see pillar scores
+- [ ] Global leaderboard tabs filter correctly
+- [ ] Seed script --clean creates all 4 projects

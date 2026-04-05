@@ -99,7 +99,7 @@ export default function RunEvalStep({ state, actions }: Props) {
           <div>
             <label style={{ fontSize: 11, color: colors.gray[500], display: 'flex', alignItems: 'center', marginBottom: 4 }}>
               Temperature
-              <Tooltip text="How creative or predictable the AI's responses will be. Low values (near 0) give consistent, focused answers. Higher values (near 1) produce more varied and creative responses." />
+              <Tooltip text="Controls how much the Run Model's answers vary each time. At 0, you'll get nearly identical responses every run — great for testing consistency. At 1, responses will differ more — useful for checking whether your prompt works even when the AI gets creative." />
             </label>
             <input
               type="number" step="0.1" min="0" max="2" value={temperature}

@@ -51,7 +51,7 @@ async def _broadcast(resource_id: str, event: str, data: dict) -> None:
 async def generate_dataset_background(
     dataset_id: uuid.UUID,
     task_description: str,
-    prompt_inputs_spec: dict[str, str],
+    prompt_inputs_spec: dict[str, dict],
     num_cases: int,
     model: str,
     user_id: uuid.UUID,
@@ -300,6 +300,133 @@ async def run_evaluation_background(
                 "avg_score": eval_run.avg_score,
                 "pass_rate": eval_run.pass_rate,
                 "total": len(test_cases),
+            })
+
+        except Exception as e:
+            result = await db.execute(select(EvalRun).where(EvalRun.id == run_id))
+            eval_run = result.scalar_one_or_none()
+            if eval_run:
+                eval_run.status = "failed"
+                eval_run.error_message = str(e)
+                await db.commit()
+            await _broadcast(resource_id, "error", {"message": str(e)})
+
+
+# ---------- Conversation Mode Eval ----------
+
+
+async def run_conversation_evaluation_background(
+    run_id: uuid.UUID,
+    project_id: uuid.UUID,
+    prompt_version_id: uuid.UUID,
+    user_id: uuid.UUID,
+    prompt_text: str,
+    task_description: str,
+    extra_criteria: str | None,
+    run_model: str,
+    grading_model: str,
+    temperature: float,
+) -> None:
+    """Background task: single-shot conversation evaluation (no dataset, no test cases)."""
+    resource_id = str(run_id)
+
+    async with async_session() as db:
+        try:
+            # Update run status
+            result = await db.execute(select(EvalRun).where(EvalRun.id == run_id))
+            eval_run = result.scalar_one()
+            eval_run.status = "running"
+            eval_run.total_cases = 1
+            await db.commit()
+
+            await _broadcast(resource_id, "status", {"status": "running", "total": 1})
+
+            loop = asyncio.get_event_loop()
+
+            # Check limits
+            allowed, reason = await usage_service.check_limits(db, user_id)
+            if not allowed:
+                eval_run.status = "failed"
+                eval_run.error_message = reason
+                await db.commit()
+                await _broadcast(resource_id, "error", {"message": reason})
+                return
+
+            # Step 1: Run conversation prompt
+            output_text, run_response = await loop.run_in_executor(
+                _executor,
+                evaluator.run_conversation_prompt,
+                prompt_text,
+                run_model,
+                temperature,
+            )
+
+            await usage_service.record_usage(
+                db, user_id, run_response.provider, run_response.model,
+                "run_prompt", run_response.input_tokens, run_response.output_tokens,
+            )
+            await db.commit()
+
+            # Check limits before grading
+            allowed, reason = await usage_service.check_limits(db, user_id)
+            if not allowed:
+                eval_run.status = "failed"
+                eval_run.error_message = reason
+                await db.commit()
+                await _broadcast(resource_id, "error", {"message": reason})
+                return
+
+            # Step 2: Grade with PPT rubric
+            grade, grade_response = await loop.run_in_executor(
+                _executor,
+                evaluator.grade_conversation_prompt,
+                task_description,
+                prompt_text,
+                output_text,
+                extra_criteria,
+                grading_model,
+            )
+
+            await usage_service.record_usage(
+                db, user_id, grade_response.provider, grade_response.model,
+                "grade_output", grade_response.input_tokens, grade_response.output_tokens,
+            )
+
+            # Save result (no test_case_id)
+            eval_result = EvalResult(
+                eval_run_id=run_id,
+                test_case_id=None,
+                rendered_prompt=prompt_text,
+                output=output_text,
+                score=grade["score"],
+                reasoning=grade["reasoning"],
+                strengths=grade.get("strengths", []),
+                weaknesses=grade.get("weaknesses", []),
+                pillar_scores=grade.get("pillar_scores"),
+            )
+            db.add(eval_result)
+
+            eval_run.completed_cases = 1
+            eval_run.avg_score = grade["score"]
+            eval_run.pass_rate = 100.0 if grade["score"] >= 7 else 0.0
+            eval_run.status = "completed"
+            eval_run.completed_at = datetime.now(timezone.utc)
+            await db.commit()
+
+            await _broadcast(resource_id, "result", {
+                "completed": 1,
+                "total": 1,
+                "score": grade["score"],
+                "output": output_text[:500],
+                "reasoning": grade["reasoning"],
+                "pillar_scores": grade.get("pillar_scores"),
+            })
+
+            await _broadcast(resource_id, "complete", {
+                "status": "completed",
+                "avg_score": eval_run.avg_score,
+                "pass_rate": eval_run.pass_rate,
+                "total": 1,
             })
 
         except Exception as e:

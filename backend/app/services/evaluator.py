@@ -24,18 +24,43 @@ def render(template_string: str, variables: dict) -> str:
     return result.replace("{{", "{").replace("}}", "}")
 
 
+TYPE_HINTS: dict[str, str] = {
+    "short_text": "a word, phrase, or sentence",
+    "paragraph": "a few sentences to a paragraph",
+    "document": "a full article, report, or multi-page text",
+    "integer": "a whole number (e.g., 5, 100, 2500)",
+    "decimal": "a number with decimals (e.g., 3.14, 98.6)",
+    "currency_usd": "a dollar amount (e.g., $49.99, $1,500.00)",
+    "list": "a list of items",
+    "json": "structured JSON data (e.g., user profile, API response)",
+}
+
+
+def normalize_spec(spec: dict) -> dict[str, dict]:
+    """Normalize prompt_inputs_spec — handles old string format and new dict format."""
+    result = {}
+    for key, value in spec.items():
+        if isinstance(value, str):
+            result[key] = {"description": value, "type": "short_text"}
+        else:
+            result[key] = dict(value) if not isinstance(value, dict) else value
+    return result
+
+
 def generate_unique_ideas(
     task_description: str,
-    prompt_inputs_spec: dict[str, str],
+    prompt_inputs_spec: dict,
     num_cases: int,
     model: str,
 ) -> tuple[list[str], LLMResponse]:
     """Generate diverse test case scenario ideas. Returns (ideas, llm_response)."""
 
+    spec = normalize_spec(prompt_inputs_spec)
     example_prompt_inputs = ""
-    for key, value in prompt_inputs_spec.items():
-        val = value.replace("\n", "\\n")
-        example_prompt_inputs += f'"{key}": str # {val},'
+    for key, info in spec.items():
+        desc = info["description"].replace("\n", "\\n")
+        dtype = info.get("type", "short_text")
+        example_prompt_inputs += f'"{key}": {dtype} # {desc},'
 
     prompt = """
     Generate {num_cases} unique, diverse ideas for testing a prompt that accomplishes this task:
@@ -103,21 +128,25 @@ def generate_unique_ideas(
 def generate_test_case(
     task_description: str,
     idea: str,
-    prompt_inputs_spec: dict[str, str],
+    prompt_inputs_spec: dict,
     model: str,
 ) -> tuple[dict, LLMResponse]:
     """Generate a single test case from a scenario idea. Returns (test_case, llm_response)."""
 
+    spec = normalize_spec(prompt_inputs_spec)
     input_variable_reqs = ""
-    for key, value in prompt_inputs_spec.items():
-        val = value.replace("\n", " ")
-        input_variable_reqs += f'- "{key}": {val}\n'
+    for key, info in spec.items():
+        desc = info["description"].replace("\n", " ")
+        dtype = info.get("type", "short_text")
+        input_variable_reqs += f'- "{key}" (type: {dtype}): {desc}\n'
 
     example_prompt_inputs = ""
-    for key, value in prompt_inputs_spec.items():
-        example_prompt_inputs += f'"{key}": "<realistic, complete content matching description>",\n'
+    for key, info in spec.items():
+        dtype = info.get("type", "short_text")
+        hint = TYPE_HINTS.get(dtype, "realistic content")
+        example_prompt_inputs += f'"{key}": "<{hint}>",\n'
 
-    allowed_keys = ", ".join([f'"{key}"' for key in prompt_inputs_spec.keys()])
+    allowed_keys = ", ".join([f'"{key}"' for key in spec.keys()])
 
     prompt = """
     Generate a single detailed test case for a prompt evaluation based on:
@@ -365,4 +394,144 @@ def grade_output(
     )
 
     grade = json.loads(response.text)
+    return grade, response
+
+
+# ---------- Conversation Mode ----------
+
+
+def run_conversation_prompt(
+    prompt: str,
+    model: str,
+    temperature: float = 1.0,
+) -> tuple[str, LLMResponse]:
+    """Run a plain conversation prompt (no template rendering, no variables).
+
+    The student's prompt is sent as the user message directly.
+    Returns (output_text, llm_response).
+    """
+    messages = [{"role": "user", "content": prompt}]
+    response = chat(messages, model=model, temperature=temperature)
+    return response.text, response
+
+
+def grade_conversation_prompt(
+    task_description: str,
+    prompt: str,
+    output: str,
+    extra_criteria: str | None,
+    model: str,
+) -> tuple[dict, LLMResponse]:
+    """Grade a conversation prompt using the PPT best-practices rubric.
+
+    Four pillars, each scored 0-2.5, summed to 1-10 overall:
+    - Clarity & Directness
+    - Specificity
+    - Examples
+    - Structure
+
+    Returns (grade_dict, llm_response) where grade_dict has:
+      pillar_scores, strengths, weaknesses, reasoning, score
+    """
+
+    extra_criteria_section = ""
+    if extra_criteria:
+        extra_criteria_section = f"""
+    Additional Evaluation Criteria (treat as extra considerations):
+    <extra_criteria>
+    {extra_criteria}
+    </extra_criteria>
+    """
+
+    grading_prompt = f"""
+    You are an expert prompt engineering evaluator. Evaluate the student's prompt
+    using the four pillars of prompt engineering best practices.
+
+    <task_description>
+    {task_description}
+    </task_description>
+
+    <student_prompt>
+    {prompt}
+    </student_prompt>
+
+    <llm_output>
+    {output}
+    </llm_output>
+    {extra_criteria_section}
+    Score each pillar from 0.0 to 2.5 based on these criteria:
+
+    **Pillar 1: Clarity & Directness (0-2.5)**
+    - First line clearly states the task
+    - Uses simple, direct language
+    - Uses action verbs (write, list, summarize, classify, etc.)
+    - Assigns a persona or role when appropriate
+    - 2.5 = exemplary, 1.5 = adequate, 0.5 = poor/missing
+
+    **Pillar 2: Specificity (0-2.5)**
+    - Provides guidelines or step-by-step instructions
+    - Defines desired output qualities (length, format, tone)
+    - Breaks complex tasks into subtasks
+    - Includes constraints and boundaries
+    - 2.5 = exemplary, 1.5 = adequate, 0.5 = poor/missing
+
+    **Pillar 3: Examples (0-2.5)**
+    - Provides sample input/output pairs
+    - Addresses edge cases
+    - Uses content tags or labeled sections
+    - Explains why the example is ideal
+    - 2.5 = exemplary, 1.5 = adequate, 0.5 = poor/missing
+
+    **Pillar 4: Structure (0-2.5)**
+    - Uses XML tags or delimiters to separate sections
+    - Has clear content boundaries
+    - Logical organization of instructions
+    - Clean separation between context, instructions, and constraints
+    - 2.5 = exemplary, 1.5 = adequate, 0.5 = poor/missing
+
+    Also evaluate the quality of the LLM output as evidence of prompt quality.
+    A well-crafted prompt should produce high-quality output.
+
+    Output Format:
+    Respond with a JSON object:
+    {{{{
+        "pillar_scores": {{{{
+            "clarity": <float 0-2.5>,
+            "specificity": <float 0-2.5>,
+            "examples": <float 0-2.5>,
+            "structure": <float 0-2.5>
+        }}}},
+        "strengths": ["strength 1", "strength 2", ...],
+        "weaknesses": ["weakness 1", "weakness 2", ...],
+        "reasoning": "Overall assessment of the prompt quality",
+        "score": <float 1-10, sum of pillar scores clamped to 1-10>
+    }}}}
+
+    IMPORTANT:
+    - The overall score MUST equal the sum of pillar scores, clamped to minimum 1.0 and maximum 10.0
+    - Be rigorous but fair — most first attempts should score 3-5
+    - A prompt with no examples should get 0.5 or less on Examples pillar
+    - A prompt with no structural elements (XML tags, delimiters) should get 0.5 or less on Structure
+    - Keep strengths and weaknesses to 1-3 items each
+    """
+
+    messages = [
+        {"role": "user", "content": dedent(grading_prompt)},
+        {"role": "assistant", "content": "```json"},
+    ]
+
+    response = chat(
+        messages,
+        model=model,
+        temperature=0.0,
+        stop_sequences=["```"],
+    )
+
+    grade = json.loads(response.text)
+
+    # Ensure score is the clamped sum of pillar scores
+    pillar_scores = grade.get("pillar_scores", {})
+    pillar_sum = sum(pillar_scores.values())
+    grade["score"] = max(1.0, min(10.0, pillar_sum))
+
     return grade, response

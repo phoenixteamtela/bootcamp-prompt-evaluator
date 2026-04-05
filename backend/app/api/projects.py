@@ -11,7 +11,8 @@ from app.models.eval_run import EvalRun
 from app.models.project import Project
 from app.models.prompt_version import PromptVersion
 from app.models.user import User
-from app.schemas.project import ProjectCreate, ProjectResponse, ProjectUpdate
+from app.schemas.project import InputVarSpec, ProjectCreate, ProjectResponse, ProjectUpdate
+from app.services.evaluator import normalize_spec
 
 router = APIRouter()
 
@@ -32,12 +33,19 @@ async def _project_response(db: AsyncSession, project: Project) -> ProjectRespon
     )
     latest_score = result.scalar_one_or_none()
 
+    # Normalize old string-format specs to {description, type} dicts
+    spec = None
+    if project.prompt_inputs_spec:
+        normalized = normalize_spec(project.prompt_inputs_spec)
+        spec = {k: InputVarSpec(**v) for k, v in normalized.items()}
+
     return ProjectResponse(
         id=str(project.id),
         user_id=str(project.user_id),
         name=project.name,
+        mode=project.mode,
         task_description=project.task_description,
-        prompt_inputs_spec=project.prompt_inputs_spec,
+        prompt_inputs_spec=spec,
         extra_criteria=project.extra_criteria,
         created_at=project.created_at,
         updated_at=project.updated_at,
@@ -67,8 +75,9 @@ async def create_project(
     project = Project(
         user_id=current_user.id,
         name=body.name,
+        mode=body.mode,
         task_description=body.task_description,
-        prompt_inputs_spec=body.prompt_inputs_spec,
+        prompt_inputs_spec={k: v.model_dump() for k, v in body.prompt_inputs_spec.items()} if body.prompt_inputs_spec else None,
         extra_criteria=body.extra_criteria,
     )
     db.add(project)
@@ -109,7 +118,7 @@ async def update_project(
     if body.task_description is not None:
         project.task_description = body.task_description
     if body.prompt_inputs_spec is not None:
-        project.prompt_inputs_spec = body.prompt_inputs_spec
+        project.prompt_inputs_spec = {k: v.model_dump() for k, v in body.prompt_inputs_spec.items()}
     if body.extra_criteria is not None:
         project.extra_criteria = body.extra_criteria
     await db.flush()
