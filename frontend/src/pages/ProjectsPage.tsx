@@ -20,21 +20,27 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     api.get<Project[]>('/api/projects').then(setProjects).finally(() => setLoading(false));
   }, []);
 
-  const handleDelete = async (e: React.MouseEvent, projectId: string, projectName: string) => {
+  const handleDeleteClick = (e: React.MouseEvent, projectId: string, projectName: string) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!window.confirm(`Delete "${projectName}"? This will permanently remove all versions, datasets, and evaluation runs.`)) return;
-    setDeletingId(projectId);
+    setConfirmDelete({ id: projectId, name: projectName });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDelete) return;
+    setDeletingId(confirmDelete.id);
+    setConfirmDelete(null);
     try {
-      await api.delete(`/api/projects/${projectId}`);
-      setProjects(prev => prev.filter(p => p.id !== projectId));
+      await api.delete(`/api/projects/${confirmDelete.id}`);
+      setProjects(prev => prev.filter(p => p.id !== confirmDelete.id));
     } catch {
-      alert('Failed to delete project');
+      // silently fail — card stays
     } finally {
       setDeletingId(null);
     }
@@ -95,6 +101,7 @@ export default function ProjectsPage() {
                 padding: 20,
                 display: 'block',
                 transition: 'box-shadow 0.2s, border-color 0.2s',
+                opacity: deletingId === p.id ? 0.5 : 1,
               }}
               onMouseEnter={e => {
                 (e.currentTarget as HTMLElement).style.borderColor = colors.orange;
@@ -118,18 +125,21 @@ export default function ProjectsPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                   <ScoreBadge score={p.latest_avg_score} size="sm" />
                   <button
-                    onClick={e => handleDelete(e, p.id, p.name)}
+                    onClick={e => handleDeleteClick(e, p.id, p.name)}
                     disabled={deletingId === p.id}
                     title="Delete project"
                     style={{
-                      background: 'none', border: 'none', cursor: deletingId === p.id ? 'not-allowed' : 'pointer',
-                      color: colors.gray[300], fontSize: 16, padding: '2px 4px', lineHeight: 1,
-                      borderRadius: 4, transition: 'color 0.15s',
+                      background: 'none', border: 'none',
+                      cursor: deletingId === p.id ? 'not-allowed' : 'pointer',
+                      color: colors.gray[300], padding: '2px 4px', lineHeight: 1,
+                      borderRadius: 4, transition: 'color 0.15s', display: 'flex',
                     }}
                     onMouseEnter={e => (e.currentTarget.style.color = colors.error)}
                     onMouseLeave={e => (e.currentTarget.style.color = colors.gray[300])}
                   >
-                    {deletingId === p.id ? '...' : '\u00d7'}
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2 4h12M5.333 4V2.667a1.333 1.333 0 011.334-1.334h2.666a1.333 1.333 0 011.334 1.334V4M6.667 7.333v4M9.333 7.333v4M12.667 4v9.333a1.333 1.333 0 01-1.334 1.334H4.667a1.333 1.333 0 01-1.334-1.334V4" />
+                    </svg>
                   </button>
                 </div>
               </div>
@@ -142,6 +152,83 @@ export default function ProjectsPage() {
               </div>
             </Link>
           ))}
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {confirmDelete && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          onClick={() => setConfirmDelete(null)}
+        >
+          <div
+            style={{
+              background: colors.white, borderRadius: 16, padding: 32,
+              maxWidth: 420, width: '90%',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Trash icon */}
+            <div style={{
+              width: 48, height: 48, borderRadius: '50%',
+              background: colors.errorBg, display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 16px',
+            }}>
+              <svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke={colors.error} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2 4h12M5.333 4V2.667a1.333 1.333 0 011.334-1.334h2.666a1.333 1.333 0 011.334 1.334V4M6.667 7.333v4M9.333 7.333v4M12.667 4v9.333a1.333 1.333 0 01-1.334 1.334H4.667a1.333 1.333 0 01-1.334-1.334V4" />
+              </svg>
+            </div>
+
+            <h3 style={{
+              margin: '0 0 8px', fontSize: 18, fontWeight: 700,
+              color: colors.navy, textAlign: 'center',
+            }}>
+              Delete Project
+            </h3>
+            <p style={{
+              margin: '0 0 8px', fontSize: 14, color: colors.gray[600],
+              textAlign: 'center', lineHeight: 1.5,
+            }}>
+              Are you sure you want to delete <strong style={{ color: colors.navy }}>{confirmDelete.name}</strong>?
+            </p>
+            <p style={{
+              margin: '0 0 24px', fontSize: 13, color: colors.gray[400],
+              textAlign: 'center', lineHeight: 1.5,
+            }}>
+              All prompt versions, datasets, and evaluation runs will be permanently removed. This action cannot be undone.
+            </p>
+
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button
+                onClick={() => setConfirmDelete(null)}
+                style={{
+                  flex: 1, padding: '10px 16px', borderRadius: 8,
+                  border: `1px solid ${colors.gray[300]}`, background: colors.white,
+                  color: colors.gray[700], fontSize: 14, fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                style={{
+                  flex: 1, padding: '10px 16px', borderRadius: 8,
+                  border: 'none', background: colors.error,
+                  color: colors.white, fontSize: 14, fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Delete Project
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
