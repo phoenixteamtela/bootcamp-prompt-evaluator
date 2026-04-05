@@ -19,10 +19,26 @@ interface Project {
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<Project[]>('/api/projects').then(setProjects).finally(() => setLoading(false));
   }, []);
+
+  const handleDelete = async (e: React.MouseEvent, projectId: string, projectName: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!window.confirm(`Delete "${projectName}"? This will permanently remove all versions, datasets, and evaluation runs.`)) return;
+    setDeletingId(projectId);
+    try {
+      await api.delete(`/api/projects/${projectId}`);
+      setProjects(prev => prev.filter(p => p.id !== projectId));
+    } catch {
+      alert('Failed to delete project');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div>
@@ -90,16 +106,32 @@ export default function ProjectsPage() {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <h3 style={{ color: colors.navy, margin: 0, fontSize: 16 }}>{p.name}</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+                  <h3 style={{ color: colors.navy, margin: 0, fontSize: 16, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</h3>
                   <span style={{
                     fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
-                    padding: '2px 6px', borderRadius: 4,
+                    padding: '2px 6px', borderRadius: 4, flexShrink: 0,
                     background: p.mode === 'conversation' ? 'rgba(232,131,42,0.1)' : colors.gray[100],
                     color: p.mode === 'conversation' ? colors.orange : colors.gray[500],
                   }}>{p.mode}</span>
                 </div>
-                <ScoreBadge score={p.latest_avg_score} size="sm" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                  <ScoreBadge score={p.latest_avg_score} size="sm" />
+                  <button
+                    onClick={e => handleDelete(e, p.id, p.name)}
+                    disabled={deletingId === p.id}
+                    title="Delete project"
+                    style={{
+                      background: 'none', border: 'none', cursor: deletingId === p.id ? 'not-allowed' : 'pointer',
+                      color: colors.gray[300], fontSize: 16, padding: '2px 4px', lineHeight: 1,
+                      borderRadius: 4, transition: 'color 0.15s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.color = colors.error)}
+                    onMouseLeave={e => (e.currentTarget.style.color = colors.gray[300])}
+                  >
+                    {deletingId === p.id ? '...' : '\u00d7'}
+                  </button>
+                </div>
               </div>
               <p style={{ color: colors.gray[600], fontSize: 13, margin: '0 0 12px', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                 {p.task_description}
