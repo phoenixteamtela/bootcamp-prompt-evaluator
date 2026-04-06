@@ -13,6 +13,7 @@ from app.models.user import User
 from app.schemas.usage import LimitResponse, LimitUpdate
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
 from app.services.auth_service import create_user, hash_password
+from app.services.clone_service import clone_projects_to_user
 
 router = APIRouter()
 
@@ -33,13 +34,15 @@ async def list_users(
 @router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_new_user(
     body: UserCreate,
-    _admin: Annotated[User, Depends(require_admin)],
+    admin: Annotated[User, Depends(require_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     existing = await db.execute(select(User).where(User.username == body.username))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Username already exists")
     user = await create_user(db, body.username, body.display_name, body.password, body.is_admin)
+    # Auto-seed starter projects from the admin who created this user
+    await clone_projects_to_user(db, source_user_id=admin.id, target_user_id=user.id)
     return UserResponse(id=str(user.id), username=user.username, display_name=user.display_name,
                         is_admin=user.is_admin, is_active=user.is_active, created_at=user.created_at)
 
@@ -66,6 +69,20 @@ async def update_user(
     await db.flush()
     return UserResponse(id=str(user.id), username=user.username, display_name=user.display_name,
                         is_admin=user.is_admin, is_active=user.is_active, created_at=user.created_at)
+
+
+@router.post("/users/{user_id}/seed-projects")
+async def seed_projects(
+    user_id: str,
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    uid = uuid.UUID(user_id)
+    result = await db.execute(select(User).where(User.id == uid))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="User not found")
+    count = await clone_projects_to_user(db, source_user_id=admin.id, target_user_id=uid)
+    return {"cloned": count}
 
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

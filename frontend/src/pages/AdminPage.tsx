@@ -45,9 +45,25 @@ export default function AdminPage() {
     } catch (err) { setError(err instanceof Error ? err.message : 'Failed'); }
   };
 
+  const [seedingUserId, setSeedingUserId] = useState<string | null>(null);
+  const [seedResult, setSeedResult] = useState<{ userId: string; count: number } | null>(null);
+
   const toggleActive = async (user: User) => {
     await api.patch(`/api/admin/users/${user.id}`, { is_active: !user.is_active });
     api.get<User[]>('/api/admin/users').then(setUsers);
+  };
+
+  const seedProjects = async (user: User) => {
+    setSeedingUserId(user.id);
+    setSeedResult(null);
+    try {
+      const res = await api.post<{ cloned: number }>(`/api/admin/users/${user.id}/seed-projects`, {});
+      setSeedResult({ userId: user.id, count: res.cloned });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Seed failed');
+    } finally {
+      setSeedingUserId(null);
+    }
   };
 
   const saveGlobalLimits = async () => {
@@ -104,8 +120,8 @@ export default function AdminPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr>
-                {['Username', 'Display Name', 'Admin', 'Active', 'Created', ''].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '10px 8px', borderBottom: `2px solid ${colors.gray[200]}`, color: colors.navy, fontSize: 12, fontWeight: 600 }}>{h}</th>
+                {['Username', 'Display Name', 'Admin', 'Active', 'Created', 'Status', 'Seed'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '10px 8px', borderBottom: `2px solid ${colors.gray[200]}`, color: colors.navy, fontSize: 12, fontWeight: 600 }}>{h === 'Status' || h === 'Seed' ? '' : h}</th>
                 ))}
               </tr>
             </thead>
@@ -125,6 +141,22 @@ export default function AdminPage() {
                     <button onClick={() => toggleActive(u)} style={{ ...btnSecondary, padding: '4px 10px', fontSize: 11 }}>
                       {u.is_active ? 'Deactivate' : 'Activate'}
                     </button>
+                  </td>
+                  <td style={{ padding: '10px 8px' }}>
+                    {!u.is_admin && (
+                      <button
+                        onClick={() => seedProjects(u)}
+                        disabled={seedingUserId === u.id}
+                        style={{ ...btnSecondary, padding: '4px 10px', fontSize: 11, opacity: seedingUserId === u.id ? 0.6 : 1 }}
+                      >
+                        {seedingUserId === u.id ? 'Seeding...' : 'Seed Projects'}
+                      </button>
+                    )}
+                    {seedResult?.userId === u.id && (
+                      <span style={{ marginLeft: 6, fontSize: 11, color: colors.success }}>
+                        {seedResult.count} cloned
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}
