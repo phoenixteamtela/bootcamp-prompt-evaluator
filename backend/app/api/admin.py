@@ -146,6 +146,21 @@ async def delete_user(
     await db.delete(user)
 
 
+@router.delete("/users", status_code=status.HTTP_200_OK)
+async def delete_all_students(
+    _admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Delete all non-admin users and their data."""
+    result = await db.execute(select(User).where(User.is_admin == False))
+    students = result.scalars().all()
+    count = len(students)
+    for user in students:
+        await db.delete(user)
+    await db.flush()
+    return {"deleted": count}
+
+
 # ---- Usage Stats ----
 
 @router.get("/usage")

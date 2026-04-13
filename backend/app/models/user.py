@@ -22,6 +22,6 @@ class User(Base):
 
     # Relationships
     projects = relationship("Project", back_populates="user", cascade="all, delete-orphan")
-    eval_runs = relationship("EvalRun", back_populates="user")
-    api_usages = relationship("ApiUsage", back_populates="user")
-    api_limit = relationship("ApiLimit", back_populates="user", uselist=False)
+    eval_runs = relationship("EvalRun", back_populates="user", cascade="all, delete-orphan")
+    api_usages = relationship("ApiUsage", back_populates="user", cascade="all, delete-orphan")
+    api_limit = relationship("ApiLimit", back_populates="user", uselist=False, cascade="all, delete-orphan")

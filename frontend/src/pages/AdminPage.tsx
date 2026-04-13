@@ -38,6 +38,10 @@ export default function AdminPage() {
   const [newUser, setNewUser] = useState({ username: '', display_name: '', password: '', is_admin: false });
   const [error, setError] = useState('');
 
+  // Delete all students state
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
+
   // Bulk create state
   const [showBulkCreate, setShowBulkCreate] = useState(false);
   const [bulkCsv, setBulkCsv] = useState('');
@@ -152,6 +156,21 @@ export default function AdminPage() {
     setBulkResult(null);
   };
 
+  const deleteAllStudents = async () => {
+    setDeletingAll(true);
+    setError('');
+    try {
+      const res = await api.delete<{ deleted: number }>('/api/admin/users');
+      setConfirmDeleteAll(false);
+      fetchUsers();
+      if (res) setError(`Deleted ${res.deleted} student(s)`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed');
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   const inputStyle = { padding: '8px 12px', borderRadius: 8, border: `1px solid ${colors.gray[300]}`, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const };
   const btnPrimary: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, border: 'none', background: gradients.phoenix, color: colors.white, fontSize: 13, fontWeight: 600, cursor: 'pointer' };
   const btnSecondary: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, border: `1px solid ${colors.gray[300]}`, background: colors.white, color: colors.gray[700], fontSize: 13, cursor: 'pointer' };
@@ -179,7 +198,18 @@ export default function AdminPage() {
         <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.gray[200]}`, padding: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
             <h2 style={{ margin: 0, fontSize: 16, color: colors.navy }}>Users</h2>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {!confirmDeleteAll ? (
+                <button onClick={() => setConfirmDeleteAll(true)} style={{ ...btnSecondary, color: colors.error, borderColor: colors.error }}>Delete All Students</button>
+              ) : (
+                <>
+                  <span style={{ fontSize: 12, color: colors.error, fontWeight: 600 }}>Are you sure?</span>
+                  <button onClick={deleteAllStudents} disabled={deletingAll} style={{ ...btnPrimary, background: colors.error, opacity: deletingAll ? 0.6 : 1 }}>
+                    {deletingAll ? 'Deleting...' : 'Yes, Delete All'}
+                  </button>
+                  <button onClick={() => setConfirmDeleteAll(false)} style={btnSecondary}>Cancel</button>
+                </>
+              )}
               <button onClick={() => { setShowBulkCreate(!showBulkCreate); if (showBulkCreate) resetBulk(); setShowCreateUser(false); }} style={btnSecondary}>Bulk Create</button>
               <button onClick={() => { setShowCreateUser(!showCreateUser); setShowBulkCreate(false); }} style={btnPrimary}>+ Create User</button>
             </div>
