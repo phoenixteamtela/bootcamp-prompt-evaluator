@@ -25,14 +25,17 @@ export default function AdminPage() {
   const [globalDay, setGlobalDay] = useState(100);
   const [globalHour, setGlobalHour] = useState(30);
 
+  const fetchUsers = () => api.get<User[]>('/api/admin/users').then(setUsers).catch(err => setError(err instanceof Error ? err.message : 'Failed to load users'));
+
   useEffect(() => {
-    if (tab === 'users') api.get<User[]>('/api/admin/users').then(setUsers);
-    if (tab === 'usage') api.get<UsageStat[]>('/api/admin/usage').then(setUsageStats);
+    setError('');
+    if (tab === 'users') fetchUsers();
+    if (tab === 'usage') api.get<UsageStat[]>('/api/admin/usage').then(setUsageStats).catch(err => setError(err instanceof Error ? err.message : 'Failed to load usage'));
     if (tab === 'limits') api.get<Limit[]>('/api/admin/limits').then(lims => {
       setLimits(lims);
       const global = lims.find(l => l.user_id === null);
       if (global) { setGlobalDay(global.max_calls_per_day); setGlobalHour(global.max_calls_per_hour); }
-    });
+    }).catch(err => setError(err instanceof Error ? err.message : 'Failed to load limits'));
   }, [tab]);
 
   const handleCreateUser = async (e: FormEvent) => {
@@ -41,7 +44,7 @@ export default function AdminPage() {
       await api.post('/api/admin/users', newUser);
       setShowCreateUser(false);
       setNewUser({ username: '', display_name: '', password: '', is_admin: false });
-      api.get<User[]>('/api/admin/users').then(setUsers);
+      fetchUsers();
     } catch (err) { setError(err instanceof Error ? err.message : 'Failed'); }
   };
 
@@ -49,8 +52,10 @@ export default function AdminPage() {
   const [seedResult, setSeedResult] = useState<{ userId: string; count: number } | null>(null);
 
   const toggleActive = async (user: User) => {
-    await api.patch(`/api/admin/users/${user.id}`, { is_active: !user.is_active });
-    api.get<User[]>('/api/admin/users').then(setUsers);
+    try {
+      await api.patch(`/api/admin/users/${user.id}`, { is_active: !user.is_active });
+      fetchUsers();
+    } catch (err) { setError(err instanceof Error ? err.message : 'Failed to update user'); }
   };
 
   const seedProjects = async (user: User) => {
@@ -67,8 +72,10 @@ export default function AdminPage() {
   };
 
   const saveGlobalLimits = async () => {
-    await api.put('/api/admin/limits/global', { max_calls_per_day: globalDay, max_calls_per_hour: globalHour });
-    api.get<Limit[]>('/api/admin/limits').then(setLimits);
+    try {
+      await api.put('/api/admin/limits/global', { max_calls_per_day: globalDay, max_calls_per_hour: globalHour });
+      api.get<Limit[]>('/api/admin/limits').then(setLimits).catch(err => setError(err instanceof Error ? err.message : 'Failed to load limits'));
+    } catch (err) { setError(err instanceof Error ? err.message : 'Failed to save limits'); }
   };
 
   const inputStyle = { padding: '8px 12px', borderRadius: 8, border: `1px solid ${colors.gray[300]}`, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const };
@@ -78,6 +85,12 @@ export default function AdminPage() {
   return (
     <div>
       <h1 style={{ color: colors.navy, fontSize: 24, marginBottom: 24 }}>Admin Panel</h1>
+      {error && (
+        <div style={{ padding: '10px 16px', marginBottom: 16, borderRadius: 8, background: colors.errorBg, color: colors.error, fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{error}</span>
+          <button onClick={() => setError('')} style={{ background: 'none', border: 'none', color: colors.error, cursor: 'pointer', fontSize: 16, padding: 0 }}>&times;</button>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 4, marginBottom: 20 }}>
         {(['users', 'usage', 'limits'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
@@ -113,7 +126,6 @@ export default function AdminPage() {
                 <input type="checkbox" checked={newUser.is_admin} onChange={e => setNewUser({ ...newUser, is_admin: e.target.checked })} /> Admin
               </label>
               <button type="submit" style={btnPrimary}>Create</button>
-              {error && <span style={{ color: colors.error, fontSize: 12 }}>{error}</span>}
             </form>
           )}
 
