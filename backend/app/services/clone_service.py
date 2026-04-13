@@ -128,6 +128,7 @@ async def clone_projects_to_user(
                 avg_score=src_run.avg_score,
                 pass_rate=src_run.pass_rate,
                 error_message=src_run.error_message,
+                is_seeded=True,
                 created_at=now,
                 completed_at=src_run.completed_at,
             ))

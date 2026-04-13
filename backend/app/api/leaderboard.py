@@ -24,7 +24,7 @@ async def global_leaderboard(
 ):
     """Global leaderboard — best avg score per student across all projects."""
     # Build base filter conditions
-    conditions = [EvalRun.status == "completed", EvalRun.avg_score.isnot(None)]
+    conditions = [EvalRun.status == "completed", EvalRun.avg_score.isnot(None), EvalRun.is_seeded == False]
     if mode:
         conditions.append(Project.mode == mode)
 
@@ -102,7 +102,7 @@ async def project_leaderboard(
             EvalRun.user_id,
             func.max(EvalRun.avg_score).label("best_score"),
         )
-        .where(EvalRun.project_id == pid, EvalRun.status == "completed", EvalRun.avg_score.isnot(None))
+        .where(EvalRun.project_id == pid, EvalRun.status == "completed", EvalRun.avg_score.isnot(None), EvalRun.is_seeded == False)
         .group_by(EvalRun.user_id)
         .subquery()
     )
