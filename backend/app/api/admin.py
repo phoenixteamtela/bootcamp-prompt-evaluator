@@ -11,7 +11,7 @@ from app.models.api_limit import ApiLimit
 from app.models.api_usage import ApiUsage
 from app.models.user import User
 from app.schemas.usage import LimitResponse, LimitUpdate
-from app.schemas.user import UserCreate, UserResponse, UserUpdate
+from app.schemas.user import BulkUserCreate, BulkUserResult, BulkUserError, UserCreate, UserResponse, UserUpdate
 from app.services.auth_service import create_user, hash_password
 from app.services.clone_service import clone_projects_to_user
 
@@ -45,6 +45,54 @@ async def create_new_user(
     await clone_projects_to_user(db, source_user_id=admin.id, target_user_id=user.id)
     return UserResponse(id=str(user.id), username=user.username, display_name=user.display_name,
                         is_admin=user.is_admin, is_active=user.is_active, created_at=user.created_at)
+
+
+@router.post("/users/bulk", response_model=BulkUserResult)
+async def bulk_create_users(
+    body: BulkUserCreate,
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    # Collect all requested usernames and check for duplicates within the batch
+    seen: dict[str, int] = {}
+    errors: list[BulkUserError] = []
+    for i, u in enumerate(body.users):
+        lower = u.username.lower()
+        if lower in seen:
+            errors.append(BulkUserError(username=u.username, detail="Duplicate within batch"))
+        else:
+            seen[lower] = i
+
+    # Check which usernames already exist in DB
+    if seen:
+        result = await db.execute(
+            select(User.username).where(
+                func.lower(User.username).in_(list(seen.keys()))
+            )
+        )
+        existing_usernames = {row.lower() for row in result.scalars().all()}
+        for username_lower in existing_usernames:
+            idx = seen.pop(username_lower, None)
+            if idx is not None:
+                errors.append(BulkUserError(
+                    username=body.users[idx].username,
+                    detail="Username already exists",
+                ))
+
+    # Create valid users
+    created: list[UserResponse] = []
+    valid_indices = set(seen.values())
+    for i, u in enumerate(body.users):
+        if i not in valid_indices:
+            continue
+        user = await create_user(db, u.username, u.display_name, u.password, False)
+        await clone_projects_to_user(db, source_user_id=admin.id, target_user_id=user.id)
+        created.append(UserResponse(
+            id=str(user.id), username=user.username, display_name=user.display_name,
+            is_admin=user.is_admin, is_active=user.is_active, created_at=user.created_at,
+        ))
+
+    return BulkUserResult(created=created, errors=errors)
 
 
 @router.patch("/users/{user_id}", response_model=UserResponse)

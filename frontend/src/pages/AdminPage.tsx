@@ -12,6 +12,23 @@ interface Limit {
   id: string | null; user_id: string | null; username: string | null; max_calls_per_day: number; max_calls_per_hour: number;
 }
 
+interface ParsedRow {
+  username: string;
+  display_name: string;
+  password: string;
+  error?: string;
+}
+
+interface BulkError {
+  username: string;
+  detail: string;
+}
+
+interface BulkResult {
+  created: User[];
+  errors: BulkError[];
+}
+
 export default function AdminPage() {
   const [tab, setTab] = useState<'users' | 'usage' | 'limits'>('users');
   const [users, setUsers] = useState<User[]>([]);
@@ -20,6 +37,13 @@ export default function AdminPage() {
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [newUser, setNewUser] = useState({ username: '', display_name: '', password: '', is_admin: false });
   const [error, setError] = useState('');
+
+  // Bulk create state
+  const [showBulkCreate, setShowBulkCreate] = useState(false);
+  const [bulkCsv, setBulkCsv] = useState('');
+  const [bulkParsed, setBulkParsed] = useState<ParsedRow[] | null>(null);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkResult, setBulkResult] = useState<BulkResult | null>(null);
 
   // Global limit edit
   const [globalDay, setGlobalDay] = useState(100);
@@ -78,6 +102,56 @@ export default function AdminPage() {
     } catch (err) { setError(err instanceof Error ? err.message : 'Failed to save limits'); }
   };
 
+  const parseBulkCsv = () => {
+    setBulkResult(null);
+    const lines = bulkCsv.trim().split('\n').filter(l => l.trim());
+    if (!lines.length) { setBulkParsed([]); return; }
+
+    // Auto-detect header row
+    let start = 0;
+    const firstLower = lines[0].toLowerCase();
+    if (firstLower.startsWith('username') || firstLower.startsWith('email')) {
+      start = 1;
+    }
+
+    const rows: ParsedRow[] = [];
+    for (let i = start; i < lines.length; i++) {
+      const parts = lines[i].split(',').map(s => s.trim());
+      const [username, display_name, password] = parts;
+      let error: string | undefined;
+      if (!username) error = 'Missing username';
+      else if (!display_name) error = 'Missing display name';
+      else if (!password) error = 'Missing password';
+      rows.push({ username: username || '', display_name: display_name || '', password: password || '', error });
+    }
+    setBulkParsed(rows);
+  };
+
+  const submitBulk = async () => {
+    if (!bulkParsed) return;
+    const valid = bulkParsed.filter(r => !r.error);
+    if (!valid.length) return;
+    setBulkSubmitting(true);
+    setError('');
+    try {
+      const res = await api.post<BulkResult>('/api/admin/users/bulk', {
+        users: valid.map(r => ({ username: r.username, display_name: r.display_name, password: r.password })),
+      });
+      setBulkResult(res);
+      if (res.created.length > 0) fetchUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Bulk create failed');
+    } finally {
+      setBulkSubmitting(false);
+    }
+  };
+
+  const resetBulk = () => {
+    setBulkCsv('');
+    setBulkParsed(null);
+    setBulkResult(null);
+  };
+
   const inputStyle = { padding: '8px 12px', borderRadius: 8, border: `1px solid ${colors.gray[300]}`, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const };
   const btnPrimary: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, border: 'none', background: gradients.phoenix, color: colors.white, fontSize: 13, fontWeight: 600, cursor: 'pointer' };
   const btnSecondary: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, border: `1px solid ${colors.gray[300]}`, background: colors.white, color: colors.gray[700], fontSize: 13, cursor: 'pointer' };
@@ -105,7 +179,10 @@ export default function AdminPage() {
         <div style={{ background: colors.white, borderRadius: 12, border: `1px solid ${colors.gray[200]}`, padding: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
             <h2 style={{ margin: 0, fontSize: 16, color: colors.navy }}>Users</h2>
-            <button onClick={() => setShowCreateUser(!showCreateUser)} style={btnPrimary}>+ Create User</button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => { setShowBulkCreate(!showBulkCreate); if (showBulkCreate) resetBulk(); setShowCreateUser(false); }} style={btnSecondary}>Bulk Create</button>
+              <button onClick={() => { setShowCreateUser(!showCreateUser); setShowBulkCreate(false); }} style={btnPrimary}>+ Create User</button>
+            </div>
           </div>
 
           {showCreateUser && (
@@ -127,6 +204,85 @@ export default function AdminPage() {
               </label>
               <button type="submit" style={btnPrimary}>Create</button>
             </form>
+          )}
+
+          {showBulkCreate && (
+            <div style={{ marginBottom: 16, padding: 16, background: colors.gray[50], borderRadius: 8 }}>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontSize: 11, color: colors.gray[500], display: 'block', marginBottom: 4 }}>Paste CSV (username, display_name, password)</label>
+                <textarea
+                  value={bulkCsv}
+                  onChange={e => { setBulkCsv(e.target.value); setBulkParsed(null); setBulkResult(null); }}
+                  placeholder={'username,display_name,password\nstudent01@phoenixteam.com,Student 01,student01@!\nstudent02@phoenixteam.com,Student 02,student02@!'}
+                  rows={6}
+                  style={{ ...inputStyle, width: '100%', fontFamily: 'monospace', fontSize: 12, resize: 'vertical' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <button onClick={parseBulkCsv} disabled={!bulkCsv.trim()} style={{ ...btnSecondary, opacity: bulkCsv.trim() ? 1 : 0.5 }}>Parse &amp; Preview</button>
+                {bulkParsed && bulkParsed.some(r => !r.error) && !bulkResult && (
+                  <button onClick={submitBulk} disabled={bulkSubmitting} style={{ ...btnPrimary, opacity: bulkSubmitting ? 0.6 : 1 }}>
+                    {bulkSubmitting ? 'Creating...' : `Create ${bulkParsed.filter(r => !r.error).length} Users`}
+                  </button>
+                )}
+                {bulkParsed && (
+                  <button onClick={resetBulk} style={btnSecondary}>Clear</button>
+                )}
+              </div>
+
+              {/* Preview table */}
+              {bulkParsed && bulkParsed.length > 0 && !bulkResult && (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr>
+                      {['Username', 'Display Name', 'Password', 'Status'].map(h => (
+                        <th key={h} style={{ textAlign: 'left', padding: '6px 8px', borderBottom: `2px solid ${colors.gray[200]}`, color: colors.navy, fontSize: 11, fontWeight: 600 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bulkParsed.map((r, i) => (
+                      <tr key={i} style={{ borderBottom: `1px solid ${colors.gray[100]}`, background: r.error ? colors.errorBg : undefined }}>
+                        <td style={{ padding: '6px 8px' }}>{r.username || '—'}</td>
+                        <td style={{ padding: '6px 8px' }}>{r.display_name || '—'}</td>
+                        <td style={{ padding: '6px 8px' }}>{r.password ? '***' : '—'}</td>
+                        <td style={{ padding: '6px 8px' }}>
+                          {r.error
+                            ? <span style={{ color: colors.error, fontSize: 11 }}>{r.error}</span>
+                            : <span style={{ color: colors.success, fontSize: 11 }}>Ready</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {bulkParsed && bulkParsed.length === 0 && (
+                <p style={{ fontSize: 12, color: colors.gray[500], margin: 0 }}>No data rows found.</p>
+              )}
+
+              {/* Results */}
+              {bulkResult && (
+                <div style={{ fontSize: 13 }}>
+                  {bulkResult.created.length > 0 && (
+                    <p style={{ color: colors.success, margin: '0 0 8px', fontWeight: 600 }}>
+                      {bulkResult.created.length} user{bulkResult.created.length !== 1 ? 's' : ''} created successfully
+                    </p>
+                  )}
+                  {bulkResult.errors.length > 0 && (
+                    <div>
+                      <p style={{ color: colors.error, margin: '0 0 4px', fontWeight: 600 }}>
+                        {bulkResult.errors.length} error{bulkResult.errors.length !== 1 ? 's' : ''}:
+                      </p>
+                      <ul style={{ margin: 0, paddingLeft: 20 }}>
+                        {bulkResult.errors.map((e, i) => (
+                          <li key={i} style={{ fontSize: 12, color: colors.error }}>{e.username}: {e.detail}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>

@@ -26,3 +26,17 @@ class UserResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class BulkUserCreate(BaseModel):
+    users: list[UserCreate]
+
+
+class BulkUserError(BaseModel):
+    username: str
+    detail: str
+
+
+class BulkUserResult(BaseModel):
+    created: list[UserResponse]
+    errors: list[BulkUserError]
