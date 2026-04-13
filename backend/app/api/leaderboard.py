@@ -49,6 +49,7 @@ async def global_leaderboard(
             best_runs.c.best_score,
         )
         .join(best_runs, User.id == best_runs.c.user_id)
+        .where(User.is_admin == False)
         .order_by(best_runs.c.best_score.desc())
     )
 
@@ -114,6 +115,7 @@ async def project_leaderboard(
             best_runs.c.best_score,
         )
         .join(best_runs, User.id == best_runs.c.user_id)
+        .where(User.is_admin == False)
         .order_by(best_runs.c.best_score.desc())
     )
 
